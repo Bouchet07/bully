@@ -16,6 +16,9 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 # Include header files
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
+# UTF-8 support
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+
 # Test
 option(BUILD_TESTS "Build tests" ON)
 

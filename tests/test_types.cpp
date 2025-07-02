@@ -466,3 +466,35 @@ TEST(DirectionTest, PawnPushDirection) {
 	EXPECT_EQ(pawn_push(WHITE), NORTH);
 	EXPECT_EQ(pawn_push(BLACK), SOUTH);
 }
+
+// Move
+TEST(MoveTest, FromTo) {
+	Move m = Move(SQ_A1, SQ_B2);
+	EXPECT_EQ(m.from_sq(), SQ_A1);
+	EXPECT_EQ(m.to_sq(), SQ_B2);
+	EXPECT_EQ(m.type_of(), NORMAL);
+	m = Move::make<PROMOTION>(SQ_C3, SQ_D4, KNIGHT);
+	EXPECT_EQ(m.from_sq(), SQ_C3);
+	EXPECT_EQ(m.to_sq(), SQ_D4);
+	EXPECT_EQ(m.type_of(), PROMOTION);
+	m = Move::make<EN_PASSANT>(SQ_E5, SQ_F6);
+	EXPECT_EQ(m.from_sq(), SQ_E5);
+	EXPECT_EQ(m.to_sq(), SQ_F6);
+	EXPECT_EQ(m.type_of(), EN_PASSANT);
+	m = Move::make<CASTLING>(SQ_G7, SQ_H8);
+	EXPECT_EQ(m.from_sq(), SQ_G7);
+	EXPECT_EQ(m.to_sq(), SQ_H8);
+	EXPECT_EQ(m.type_of(), CASTLING);
+}
+
+// Move equality
+TEST(MoveTest, Equality) {
+	Move m1 = Move(SQ_A1, SQ_B2);
+	Move m2 = Move(SQ_A1, SQ_B2);
+	Move m3 = Move(SQ_C3, SQ_D4);
+	EXPECT_TRUE(m1 == m2);
+	EXPECT_FALSE(m1 == m3);
+	EXPECT_FALSE(m2 == m3);
+	EXPECT_TRUE(m1 != m3);
+	EXPECT_TRUE(m2 != m3);
+}
