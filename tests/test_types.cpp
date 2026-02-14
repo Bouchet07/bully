@@ -54,8 +54,6 @@ TEST(PieceTypeTest, IncrementOperators) {
 	EXPECT_EQ(++bishop, ROOK);
 	EXPECT_EQ(++rook, QUEEN);
 	EXPECT_EQ(++queen, KING);
-	
-	EXPECT_EQ(++king, PIECE_TYPE_NB);
 }
 
 // PieceType decrement operators

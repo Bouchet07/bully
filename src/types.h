@@ -76,14 +76,14 @@ constexpr Value QueenValue = 2538;
 enum PieceType : uint8_t {
     NO_PIECE_TYPE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING,
     ALL_PIECES = 0,
-    PIECE_TYPE_NB = 7 // stockfish uses 8, mine breaks
+    PIECE_TYPE_NB = 8 // power of 2 for faster indexing
 };
 
 enum Piece : uint8_t {
     NO_PIECE,
     W_PAWN = PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,
     B_PAWN = PAWN + 8, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING,
-    PIECE_NB = 16
+    PIECE_NB = 16 // power of 2 for faster indexing
 };
 
 enum Square : int8_t {

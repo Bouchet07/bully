@@ -36,6 +36,14 @@ constexpr Bitboard Rank6BB = Rank1BB << (8 * 5);
 constexpr Bitboard Rank7BB = Rank1BB << (8 * 6);
 constexpr Bitboard Rank8BB = Rank1BB << (8 * 7);
 
+extern uint8_t SquareDistance[SQUARE_NB][SQUARE_NB];
+
+extern Bitboard LineBB[SQUARE_NB][SQUARE_NB];
+extern Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
+extern Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB]; // maybe on attacks.h
+
+void init_bitboards();
+
 constexpr Bitboard square_bb(Square s) { return (1ULL << s); }
 
 // Overloads of bitwise operators between a Bitboard and a Square for testing
@@ -82,3 +90,45 @@ constexpr Bitboard shift(Bitboard b) {
         : D == SOUTH_WEST ? (b & ~FileABB) >> 9
         : 0;
 }
+
+// Returns a bitboard representing an entire line (from board edge
+// to board edge) that intersects the two given squares. If the given squares
+// are not on a same file/rank/diagonal, the function returns 0. For instance,
+// line_bb(SQ_C4, SQ_F7) will return a bitboard with the A2-G8 diagonal.
+inline Bitboard line_bb(Square s1, Square s2) { return LineBB[s1][s2]; }
+
+// Returns a bitboard representing the squares in the semi-open
+// segment between the squares s1 and s2 (excluding s1 but including s2). If the
+// given squares are not on a same file/rank/diagonal, it returns s2. For instance,
+// between_bb(SQ_C4, SQ_F7) will return a bitboard with squares D5, E6 and F7, but
+// between_bb(SQ_E6, SQ_F8) will return a bitboard with the square F8. This trick
+// allows to generate non-king evasion moves faster: the defending piece must either
+// interpose itself to cover the check or capture the checking piece.
+inline Bitboard between_bb(Square s1, Square s2) { return BetweenBB[s1][s2]; }
+
+// Returns true if the squares s1, s2 and s3 are aligned either on a
+// straight or on a diagonal line.
+inline bool aligned(Square s1, Square s2, Square s3) { return line_bb(s1, s2) & s3; }
+
+// distance() functions return the distance between x and y, defined as the
+// number of steps for a king in x to reach y.
+
+template<typename T1 = Square>
+inline uint8_t distance(Square x, Square y);
+
+template<>
+inline uint8_t distance<File>(Square x, Square y) {
+    return std::abs(file_of(x) - file_of(y));
+}
+
+template<>
+inline uint8_t distance<Rank>(Square x, Square y) {
+    return std::abs(rank_of(x) - rank_of(y));
+}
+
+template<>
+inline uint8_t distance<Square>(Square x, Square y) {
+    return SquareDistance[x][y];
+}
+
+inline uint8_t edge_distance(File f) { return std::min(f, File(FILE_H - f)); }
