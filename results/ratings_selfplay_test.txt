@@ -1,0 +1,8 @@
+
+   # PLAYER           :  RATING  POINTS  PLAYED   (%)
+   1 Base             :  2300.0    12.5      25    50
+   2 selfplay_test    :  2300.0    12.5      25    50
+
+White advantage = 0.00
+Draw rate (equal opponents) = 50.00 %
+

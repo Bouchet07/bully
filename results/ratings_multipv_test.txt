@@ -1,0 +1,8 @@
+
+   # PLAYER          :  RATING  POINTS  PLAYED   (%)
+   1 multipv_test    :  2448.5     7.0      10    70
+   2 Base            :  2300.0     3.0      10    30
+
+White advantage = 0.00
+Draw rate (equal opponents) = 50.00 %
+

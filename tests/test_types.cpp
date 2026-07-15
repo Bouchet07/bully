@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../src/types.h"
 
+using namespace Bully;
+
 
 // Test ENABLE_INCR_OPERATORS_ON
 
