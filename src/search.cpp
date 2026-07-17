@@ -249,6 +249,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     Color us = pos.side_to_move();
     bool in_check = pos.attacked(pos.king_square(us), ~us);
+    int extension = (in_check && ply < MAX_PLY - 1) ? 1 : 0;
 
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
     if (use_rfp
@@ -344,7 +345,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
         Value score;
         if (legal_moves == 1) {
-            score = -pvs(pos, -beta, -alpha, depth - 1, ply + 1, ss, heuristics);
+            score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
         } else {
             int reduction = 0;
             if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !in_check) {
@@ -361,14 +362,14 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 reduction = std::clamp(reduction, 0, depth - 1);
             }
 
-            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction, ply + 1, ss, heuristics);
+            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction + extension, ply + 1, ss, heuristics);
 
             if (score > alpha && reduction > 0) {
-                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1, ply + 1, ss, heuristics);
+                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
             }
 
             if (score > alpha && score < beta) {
-                score = -pvs(pos, -beta, -alpha, depth - 1, ply + 1, ss, heuristics);
+                score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
             }
         }
 
