@@ -706,12 +706,12 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 }
 
                 if (score <= alpha) {
-                    beta = static_cast<Value>((static_cast<int>(alpha) + static_cast<int>(beta)) / 2);
+                    beta = alpha;
                     alpha = static_cast<Value>(std::max(static_cast<int>(alpha) - delta, -static_cast<int>(VALUE_INFINITE)));
                     delta += delta / 2;
                 }
                 else if (score >= beta) {
-                    alpha = static_cast<Value>((static_cast<int>(alpha) + static_cast<int>(beta)) / 2);
+                    alpha = beta;
                     beta = static_cast<Value>(std::min(static_cast<int>(beta) + delta, static_cast<int>(VALUE_INFINITE)));
                     delta += delta / 2;
                 }
