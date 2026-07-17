@@ -20,6 +20,7 @@ struct Limits {
     uint64_t nodes = 0;   // Maximum nodes to search
     int movetime = -1;    // Fixed search time per move (ms)
     bool infinite = false;// Search until explicit 'stop' command
+    bool ponder = false;  // Search in background for anticipated opponent move
 
     [[nodiscard]] bool time_controlled() const {
         return wtime != -1 || btime != -1 || movetime != -1;
@@ -28,15 +29,22 @@ struct Limits {
 
 // Global control flag to abort search immediately
 extern std::atomic<bool> stopped;
+extern std::atomic<bool> pondering;
+extern std::atomic<int64_t> search_start_time_ms;
 extern int num_threads;
 extern int multipv_count;
+extern bool use_nmp;
+extern bool use_lmr;
+extern bool use_rfp;
+extern bool use_lmp;
+extern bool use_fp;
+extern bool use_check_extensions;
 
 // Statistics and timing tracking for the active search
 struct SearchState {
     Limits limits;
     uint64_t nodes = 0;
     int seldepth = 0;
-    std::chrono::steady_clock::time_point start_time;
     int time_limit = -1;  // Calculated optimal search time (ms)
     int thread_id = 0;    // Thread ID (0 = main thread, >0 = helper threads)
     

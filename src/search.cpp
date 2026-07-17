@@ -28,6 +28,7 @@ bool use_lmr = true;
 bool use_rfp = true;
 bool use_lmp = true;
 bool use_fp = true;
+bool use_check_extensions = true;
 static std::thread controller_thread;
 
 // LMR reductions table
@@ -249,7 +250,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     Color us = pos.side_to_move();
     bool in_check = pos.attacked(pos.king_square(us), ~us);
-    int extension = (in_check && ply < MAX_PLY - 1) ? 1 : 0;
+    int extension = (use_check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
 
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
     if (use_rfp
