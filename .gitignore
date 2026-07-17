@@ -44,3 +44,10 @@
 .vs/*
 out/*
 build/
+
+# Bully tournament results, logs, and testing binaries
+engines/
+results/
+*.pgn
+ratings_test.txt
+AGENTS.md

@@ -1,8 +1,0 @@
-
-   # PLAYER    :  RATING  POINTS  PLAYED   (%)
-   1 rfp       :  2395.8    95.0     150    63
-   2 Base      :  2300.0    55.0     150    37
-
-White advantage = 0.00
-Draw rate (equal opponents) = 50.00 %
-
