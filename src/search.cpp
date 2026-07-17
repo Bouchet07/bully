@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <cmath>
 
 #include "search.h"
 #include "tt.h"
@@ -18,9 +19,34 @@ namespace Search {
 
 // Global variables
 std::atomic<bool> stopped(true);
+std::atomic<bool> pondering(false);
+std::atomic<int64_t> search_start_time_ms(0);
 int num_threads = 1;
 int multipv_count = 1;
+bool use_nmp = true;
+bool use_lmr = true;
+bool use_rfp = true;
+bool use_lmp = true;
+bool use_fp = true;
 static std::thread controller_thread;
+
+// LMR reductions table
+static int Reductions[MAX_PLY][MAX_MOVES];
+
+struct SearchInitializer {
+    SearchInitializer() {
+        for (int d = 0; d < MAX_PLY; ++d) {
+            for (int m = 0; m < MAX_MOVES; ++m) {
+                if (d == 0 || m == 0) {
+                    Reductions[d][m] = 0;
+                } else {
+                    double r = std::log(d) * std::log(m) / 1.95;
+                    Reductions[d][m] = static_cast<int>(r + 0.5);
+                }
+            }
+        }
+    }
+} search_initializer;
 
 // Quiet Move Ordering heuristic tables local to each search thread
 struct Heuristics {
@@ -45,19 +71,6 @@ struct SearchWorker {
     Heuristics heuristics;
 };
 
-
-static int get_piece_value(PieceType pt) {
-    switch (pt) {
-        case PAWN:   return 100;
-        case KNIGHT: return 320;
-        case BISHOP: return 330;
-        case ROOK:   return 500;
-        case QUEEN:  return 900;
-        case KING:   return 10000;
-        default:     return 0;
-    }
-}
-
 static bool is_repetition(const Position& pos) {
     const StateInfo* state = pos.state();
     int limit = std::min(pos.rule50(), 100);
@@ -80,10 +93,15 @@ void SearchState::check_limits() {
         return;
     }
 
+    if (pondering.load(std::memory_order_relaxed)) {
+        return;
+    }
+
     if (time_limit != -1) {
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start_time
-        ).count();
+        auto now = std::chrono::steady_clock::now();
+        int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+        int64_t start_ms = search_start_time_ms.load(std::memory_order_relaxed);
+        int64_t elapsed = now_ms - start_ms;
         if (elapsed >= time_limit) {
             stopped.store(true, std::memory_order_relaxed);
         }
@@ -233,7 +251,8 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     bool in_check = pos.attacked(pos.king_square(us), ~us);
 
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
-    if (!in_check
+    if (use_rfp
+        && !in_check
         && depth <= 3
         && beta - alpha <= 1
         && std::abs(beta) < VALUE_MATE_IN_MAX_PLY) {
@@ -246,7 +265,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     // 2. Null Move Pruning (NMP)
-    if (!in_check && depth >= 3 && Eval::evaluate(pos) >= beta) {
+    if (use_nmp && !in_check && depth >= 3 && Eval::evaluate(pos) >= beta) {
         Bitboard major_pieces = pos.pieces(us) ^ pos.pieces(us, PAWN) ^ pos.pieces(us, KING);
         if (major_pieces != 0) {
             StateInfo next_si;
@@ -270,6 +289,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     int legal_moves = 0;
+    int quiet_moves_searched = 0;
+    std::array<Move, 64> quiet_moves;
+    int quiet_count = 0;
     Move best_move = Move::none();
     Value best_score = -VALUE_INFINITE;
     Bound bound_type = BOUND_UPPER;
@@ -286,6 +308,27 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
         Move m = list[i].move;
         
+        bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
+        if (!is_cap) {
+            quiet_moves_searched++;
+
+            // Late Move Pruning (LMP): Prune quiet moves at low depths when count exceeds threshold
+            if (use_lmp && !in_check && depth < 4) {
+                int lmp_threshold = 3 + depth * depth;
+                if (quiet_moves_searched > lmp_threshold) {
+                    continue;
+                }
+            }
+
+            // Futility Pruning: Prune quiet moves at depth 1 when evaluation is far below alpha
+            if (use_fp && !in_check && depth == 1) {
+                int margin = 150;
+                if (Eval::evaluate(pos) + margin < alpha) {
+                    continue;
+                }
+            }
+        }
+
         StateInfo next_si;
         if (!pos.make_move(m, next_si)) {
             pos.unmake_move(m);
@@ -295,17 +338,27 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         legal_moves++;
         ss.nodes++;
 
+        if (!is_cap && quiet_count < 64) {
+            quiet_moves[static_cast<size_t>(quiet_count++)] = m;
+        }
+
         Value score;
         if (legal_moves == 1) {
             score = -pvs(pos, -beta, -alpha, depth - 1, ply + 1, ss, heuristics);
         } else {
-            bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
-            
-            // Lazy SMP Diversification: apply slightly different LMR reduction based on thread_id
-            int LMR_offset = (ss.thread_id > 0 && ((legal_moves + ss.thread_id) & 1)) ? 1 : 0;
             int reduction = 0;
-            if (depth >= 3 && legal_moves > 4 && !is_cap && !in_check) {
-                reduction = 1 + LMR_offset;
+            if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !in_check) {
+                int d_idx = std::min(static_cast<int>(depth), static_cast<int>(MAX_PLY - 1));
+                int m_idx = std::min(legal_moves, static_cast<int>(MAX_MOVES - 1));
+                reduction = Reductions[d_idx][m_idx];
+
+                // Lazy SMP Diversification: apply slightly different LMR reduction based on thread_id
+                if (ss.thread_id > 0 && ((legal_moves + ss.thread_id) & 1)) {
+                    reduction++;
+                }
+
+                // Clamp reduction to prevent reducing below depth 0
+                reduction = std::clamp(reduction, 0, depth - 1);
             }
 
             score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction, ply + 1, ss, heuristics);
@@ -338,7 +391,6 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         if (score >= beta) {
             bound_type = BOUND_LOWER;
             
-            bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
             if (!is_cap) {
                 size_t p_idx = static_cast<size_t>(ply);
                 if (heuristics.killer1[p_idx] != m) {
@@ -347,6 +399,15 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 }
                 Piece pc = pos.piece_on(m.from_sq());
                 heuristics.history[to_index(pc)][to_index(m.to_sq())] += depth * depth;
+
+                // Penalize other quiet moves that failed to cause a cutoff
+                for (int q = 0; q < quiet_count; ++q) {
+                    Move qm = quiet_moves[static_cast<size_t>(q)];
+                    if (qm != m) {
+                        Piece qpc = pos.piece_on(qm.from_sq());
+                        heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= depth * depth;
+                    }
+                }
             }
             break;
         }
@@ -377,6 +438,13 @@ static void worker_run(SearchWorker* w) {
         if (stopped.load(std::memory_order_relaxed)) {
             break;
         }
+
+        // Decay history
+        for (auto& row : w->heuristics.history) {
+            for (auto& val : row) {
+                val /= 2;
+            }
+        }
     }
 }
 
@@ -393,6 +461,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     TT.new_search();
 
     auto start_time = std::chrono::steady_clock::now();
+    search_start_time_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count(), std::memory_order_relaxed);
     int time_limit = -1;
 
     // Time budget allocation
@@ -430,7 +499,6 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         w->id = i;
         w->ss.limits = limits;
         w->ss.thread_id = i;
-        w->ss.start_time = start_time;
         w->ss.time_limit = time_limit;
         
         // Clone stack history
@@ -710,6 +778,14 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             if (limits.time_controlled() && elapsed >= time_limit) {
                 break;
             }
+
+            // Decay history
+            for (auto& row : main_worker->heuristics.history) {
+                for (auto& val : row) {
+                    val /= 2;
+                }
+            }
+
             last_score = score;
         }
     }
