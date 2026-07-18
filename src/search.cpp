@@ -242,6 +242,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     ss.seldepth = std::max(ss.seldepth, ply);
+    if (ply < MAX_PLY) {
+        ss.pv_length[to_index(ply)] = 0;
+    }
 
     // 1. Transposition Table Probe
     Move tt_move = Move::none();
@@ -398,6 +401,18 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         if (score > alpha) {
             alpha = score;
             bound_type = BOUND_EXACT;
+
+            if (ply < MAX_PLY) {
+                size_t p = to_index(ply);
+                size_t p_next = to_index(ply + 1);
+                ss.pv_table[p][0] = m;
+                int child_len = (ply + 1 < MAX_PLY) ? ss.pv_length[p_next] : 0;
+                int copy_len = std::min(child_len, MAX_PLY - 1);
+                for (int j = 0; j < copy_len; ++j) {
+                    ss.pv_table[p][static_cast<size_t>(j + 1)] = ss.pv_table[p_next][static_cast<size_t>(j)];
+                }
+                ss.pv_length[p] = copy_len + 1;
+            }
         }
 
         if (score >= beta) {
@@ -617,43 +632,9 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 root_moves[i].score = score;
 
                 std::string pv_str = m.to_string();
-                Position pv_pos = pos;
-                std::vector<StateInfo> pv_history;
-                pv_history.reserve(static_cast<size_t>(d));
-                StateInfo first_si;
-                pv_pos.make_move(m, first_si);
-
-                Move next_pv_move = Move::none();
-                Value dummy_score, dummy_eval;
-                int dummy_depth;
-                Bound dummy_bound;
-
-                for (int pv_depth = 1; pv_depth < d; ++pv_depth) {
-                    if (TT.probe(pv_pos.key(), next_pv_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)) {
-                        if (next_pv_move != Move::none() && next_pv_move.is_ok()) {
-                            MoveList legal_moves_list;
-                            legal_moves_list.generate(pv_pos);
-                            bool is_legal = false;
-                            for (size_t l = 0; l < legal_moves_list.size(); ++l) {
-                                if (legal_moves_list[l].move == next_pv_move) {
-                                    is_legal = true;
-                                    break;
-                                }
-                            }
-                            if (!is_legal) break;
-
-                            pv_str += " " + next_pv_move.to_string();
-                            pv_history.emplace_back();
-                            if (!pv_pos.make_move(next_pv_move, pv_history.back())) {
-                                pv_pos.unmake_move(next_pv_move);
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
+                int child_len = main_worker->ss.pv_length[1];
+                for (int j = 0; j < child_len; ++j) {
+                    pv_str += " " + main_worker->ss.pv_table[1][static_cast<size_t>(j)].to_string();
                 }
                 root_moves[i].pv_str = pv_str;
 
@@ -741,13 +722,17 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 break;
             }
 
-            Move depth_best_move = Move::none();
-            Value dummy_score, dummy_eval;
-            int dummy_depth;
-            Bound dummy_bound;
-            if (TT.probe(main_worker->pos.key(), depth_best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)) {
-                if (depth_best_move != Move::none()) {
-                    best_move = depth_best_move;
+            if (main_worker->ss.pv_length[0] > 0) {
+                best_move = main_worker->ss.pv_table[0][0];
+            } else {
+                Move depth_best_move = Move::none();
+                Value dummy_score, dummy_eval;
+                int dummy_depth;
+                Bound dummy_bound;
+                if (TT.probe(main_worker->pos.key(), depth_best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)) {
+                    if (depth_best_move != Move::none()) {
+                        best_move = depth_best_move;
+                    }
                 }
             }
 
@@ -765,20 +750,30 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             double nps = (secs > 0.0) ? (static_cast<double>(total_nodes) / secs) : 0.0;
 
             std::string pv_str;
-            Position pv_pos = pos;
-            std::vector<StateInfo> pv_history;
-            pv_history.reserve(static_cast<size_t>(d));
-            Move next_pv_move = best_move;
-
-            for (int pv_depth = 0; pv_depth < d && next_pv_move != Move::none(); ++pv_depth) {
-                pv_str += (pv_str.empty() ? "" : " ") + next_pv_move.to_string();
-                pv_history.emplace_back();
-                if (!pv_pos.make_move(next_pv_move, pv_history.back())) {
-                    break;
+            int pv_len = main_worker->ss.pv_length[0];
+            if (pv_len > 0) {
+                for (int j = 0; j < pv_len; ++j) {
+                    pv_str += (j == 0 ? "" : " ") + main_worker->ss.pv_table[0][static_cast<size_t>(j)].to_string();
                 }
-                Move inner_best = Move::none();
-                TT.probe(pv_pos.key(), inner_best, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
-                next_pv_move = inner_best;
+            } else {
+                Position pv_pos = pos;
+                std::vector<StateInfo> pv_history;
+                pv_history.reserve(static_cast<size_t>(d));
+                Move next_pv_move = best_move;
+                Value dummy_score, dummy_eval;
+                int dummy_depth;
+                Bound dummy_bound;
+
+                for (int pv_depth = 0; pv_depth < d && next_pv_move != Move::none(); ++pv_depth) {
+                    pv_str += (pv_str.empty() ? "" : " ") + next_pv_move.to_string();
+                    pv_history.emplace_back();
+                    if (!pv_pos.make_move(next_pv_move, pv_history.back())) {
+                        break;
+                    }
+                    Move inner_best = Move::none();
+                    TT.probe(pv_pos.key(), inner_best, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
+                    next_pv_move = inner_best;
+                }
             }
 
             if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
@@ -817,12 +812,16 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
     }
 
-    // If main thread failed to retrieve move, fallback check TT
+    // If main thread failed to retrieve move, fallback check PV table or TT
     if (best_move == Move::none()) {
-        Value dummy_score, dummy_eval;
-        int dummy_depth;
-        Bound dummy_bound;
-        TT.probe(pos.key(), best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
+        if (main_worker->ss.pv_length[0] > 0) {
+            best_move = main_worker->ss.pv_table[0][0];
+        } else {
+            Value dummy_score, dummy_eval;
+            int dummy_depth;
+            Bound dummy_bound;
+            TT.probe(pos.key(), best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
+        }
     }
 
     std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;

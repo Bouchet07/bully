@@ -53,6 +53,10 @@ struct SearchState {
     int time_limit = -1;  // Calculated optimal search time (ms)
     int thread_id = 0;    // Thread ID (0 = main thread, >0 = helper threads)
     
+    // Triangular PV Table
+    std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table{};
+    std::array<int, MAX_PLY> pv_length{};
+
     // Check if we should abort the search (e.g. time limit reached)
     void check_limits();
 };

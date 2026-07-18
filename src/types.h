@@ -285,9 +285,14 @@ inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
 }
 
 // Convert strongly-typed enum values to size_t for safe array indexing (avoids sign-conversion warnings)
-template<typename T>
+template<typename T> requires std::is_enum_v<T>
 [[nodiscard]] constexpr size_t to_index(T val) {
     return static_cast<size_t>(std::to_underlying(val));
+}
+
+template<typename T> requires std::is_integral_v<T>
+[[nodiscard]] constexpr size_t to_index(T val) {
+    return static_cast<size_t>(val);
 }
 
 // ============================================================================
