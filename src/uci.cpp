@@ -183,6 +183,10 @@ bool UCI::execute_line(const std::string& line) {
         else if (token == "isready") {
             std::cout << "readyok\n" << std::flush;
         }
+        else if (token == "ucinewgame") {
+            Search::stop_and_join();
+            TT.clear();
+        }
         else if (token == "setoption") {
             std::string name_keyword;
             is >> name_keyword;
@@ -645,20 +649,43 @@ bool UCI::execute_line(const std::string& line) {
             pos.print(use_utf8, use_color);
         }
         else if (token == "hash") {
-            int val = 0;
-            if (is >> val) {
-                TT.resize(static_cast<size_t>(val));
-                if (is_interactive()) {
-                    std::cout << std::format("Hash size resized to {}{}{} MB.\n", style.magenta, val, style.reset);
+            std::string sub;
+            if (is >> sub) {
+                std::string lower_sub = sub;
+                for (char &c : lower_sub) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+                if (lower_sub == "clear") {
+                    TT.clear();
+                    if (is_interactive()) {
+                        std::cout << std::format("{}Hash table cleared.{}\n", style.green, style.reset);
+                    } else {
+                        std::cout << "Hash table cleared.\n";
+                    }
                 } else {
-                    std::cout << std::format("Hash size resized to {} MB.\n", val);
+                    try {
+                        size_t val = std::stoull(sub);
+                        TT.resize(val);
+                        if (is_interactive()) {
+                            std::cout << std::format("Hash size resized to {}{}{} MB.\n", style.magenta, val, style.reset);
+                        } else {
+                            std::cout << std::format("Hash size resized to {} MB.\n", val);
+                        }
+                    } catch (...) {
+                        if (is_interactive()) {
+                            std::cout << std::format("{}Invalid hash argument: '{}'. Usage: {}hash{} {}<MB>{} | {}hash clear{}\n",
+                                                     style.red, sub, style.yellow, style.reset, style.magenta, style.reset, style.yellow, style.reset);
+                        } else {
+                            std::cout << std::format("Invalid hash argument: '{}'. Usage: hash <MB> | hash clear\n", sub);
+                        }
+                    }
                 }
             } else {
                 if (is_interactive()) {
-                    std::cout << std::format("{}Current Hash size{}: {}{} MB{}\nUsage: {}hash{} {}<size_in_MB>{} (e.g., 'hash 64')\n",
-                                             style.green, style.reset, style.magenta, TT.get_size_mb(), style.reset, style.yellow, style.reset, style.magenta, style.reset);
+                    std::cout << std::format("{}Current Hash size{}: {}{} MB{}\nUsage: {}hash{} {}<MB>{} | {}hash clear{}\n",
+                                             style.green, style.reset, style.magenta, TT.get_size_mb(), style.reset,
+                                             style.yellow, style.reset, style.magenta, style.reset, style.yellow, style.reset);
                 } else {
-                    std::cout << std::format("Current Hash size: {} MB\nUsage: hash <size_in_MB> (e.g., 'hash 64')\n", TT.get_size_mb());
+                    std::cout << std::format("Current Hash size: {} MB\nUsage: hash <MB> | hash clear\n", TT.get_size_mb());
                 }
             }
         }
@@ -876,7 +903,7 @@ bool UCI::execute_line(const std::string& line) {
                     std::cout << "  " << style.green << "KillerHeuristic" << style.reset << " (" << style.magenta << "kh" << style.reset << ")           : "
                               << style.magenta << (Search::use_killers ? "ON" : "OFF") << style.reset << "\n";
                     std::cout << "  " << style.green << "HistoryHeuristic" << style.reset << " (" << style.magenta << "hh" << style.reset << ")          : "
-                              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n";
+                              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n\n";
                     std::cout << "  " << style.green << "Usage" << style.reset << ": "
                               << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]"
                               << "  (e.g., " << style.yellow << "options" << style.reset << " " << style.magenta << "lmr" << style.reset << " " << style.green << "off" << style.reset << ")\n";
@@ -894,7 +921,7 @@ bool UCI::execute_line(const std::string& line) {
                     std::cout << "  UseTT (tt)                     : " << (Search::use_tt ? "ON" : "OFF") << "\n";
                     std::cout << "  KillerHeuristic (kh)           : " << (Search::use_killers ? "ON" : "OFF") << "\n";
                     std::cout << "  HistoryHeuristic (hh)          : " << (Search::use_history ? "ON" : "OFF") << "\n";
-                    std::cout << "  Usage: options [name [on|off]] (e.g., options lmr off)\n";
+                    std::cout << "  \nUsage: options [name [on|off]] (e.g., options lmr off)\n";
                     std::cout << "=======================================\n\n";
                 }
             }
@@ -967,42 +994,42 @@ bool UCI::execute_line(const std::string& line) {
             if (is_interactive()) {
                 std::cout << "\n" << style.blue << "============= Bully Interactive CLI Guide =============" << style.reset << "\n";
                 std::cout << "  " << style.yellow << "d" << style.reset << " / " << style.yellow << "display" << style.reset
-                          << "                       : Visual representation of the active position.\n";
+                          << "                : Visual representation of the active position.\n";
                 std::cout << "  " << style.yellow << "position" << style.reset << " " << style.green << "startpos" << style.reset
-                          << "                 : Load standard chess starting position.\n";
+                          << "          : Load standard chess starting position.\n";
                 std::cout << "  " << style.yellow << "position" << style.reset << " " << style.green << "fen" << style.reset << " "
                           << style.magenta << "<FEN>" << style.reset
-                          << "                : Load a FEN string position.\n";
-                std::cout << "                                      (Add '" << style.green << "moves" << style.reset << " " << style.magenta << "e2e4 ..." << style.reset << "' to play moves on top).\n";
+                          << "         : Load a FEN string position.\n";
+                std::cout << "                               (Add '" << style.green << "moves" << style.reset << " " << style.magenta << "e2e4 ..." << style.reset << "' to play moves on top).\n";
                 std::cout << "  " << style.yellow << "move" << style.reset << " "
-                          << style.magenta << "<e2e4>" << style.reset << " [" << style.magenta << "e7e5 ..." << style.reset << "]             : Play one or more moves on the active board.\n";
+                          << style.magenta << "<e2e4>" << style.reset << " [" << style.magenta << "e7e5 ..." << style.reset << "]     : Play one or more moves on the active board.\n";
                 std::cout << "  " << style.yellow << "go" << style.reset << " [" << style.green << "depth" << style.reset << " "
-                          << style.magenta << "<D>" << style.reset << "] [" << style.green << "ponder" << style.reset << "]             : Search (optionally ponder in background) the active position.\n";
-                std::cout << "  " << style.yellow << "ponderhit" << style.reset << "                         : Transition a background ponder search into active search.\n";
-                std::cout << "  " << style.yellow << "stop" << style.reset << "                              : Abort a running search.\n";
-                std::cout << "  " << style.yellow << "eval" << style.reset << "                              : Print detailed static evaluation breakdown.\n";
+                          << style.magenta << "<D>" << style.reset << "] [" << style.green << "ponder" << style.reset << "]    : Search (optionally ponder in background) the active position.\n";
+                std::cout << "  " << style.yellow << "ponderhit" << style.reset << "                  : Transition a background ponder search into active search.\n";
+                std::cout << "  " << style.yellow << "stop" << style.reset << "                       : Abort a running search.\n";
+                std::cout << "  " << style.yellow << "eval" << style.reset << "                       : Print detailed static evaluation breakdown.\n";
                 std::cout << "  " << style.yellow << "perft" << style.reset << " "
                           << style.magenta << "<depth>" << style.reset
-                          << "                     : Measure speed & count leaf nodes recursively.\n";
+                          << "              : Measure speed & count leaf nodes recursively.\n";
                 std::cout << "  " << style.yellow << "divide" << style.reset << " "
                           << style.magenta << "<depth>" << style.reset
-                          << "                    : Print move-by-move node counts (divide test).\n";
+                          << "             : Print move-by-move node counts (divide test).\n";
                 std::cout << "  " << style.yellow << "hash" << style.reset << " "
                           << style.magenta << "<MB>" << style.reset
-                          << "                         : Resize transposition table (in Megabytes).\n";
+                          << "                  : Resize transposition table (in Megabytes).\n";
                 std::cout << "  " << style.yellow << "threads" << style.reset << " "
                           << style.magenta << "<count>" << style.reset
-                          << "                   : Set the number of search threads.\n";
+                          << "            : Set the number of search threads.\n";
                 std::cout << "  " << style.yellow << "multipv" << style.reset << " "
                           << style.magenta << "<count>" << style.reset
-                          << "                   : Set the number of PV lines to show in search.\n";
-                std::cout << "  " << style.yellow << "utf8" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]                 : Toggle UTF-8 grid graphics.\n";
-                std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]                : Toggle ANSI terminal colors.\n";
-                std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]             : Toggle board auto-printing after moves.\n";
-                std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]         : View or toggle search heuristic options.\n";
-                std::cout << "  " << style.yellow << "uci" << style.reset << "                               : Switch to UCI engine mode.\n";
+                          << "            : Set the number of PV lines to show in search.\n";
+                std::cout << "  " << style.yellow << "utf8" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]            : Toggle UTF-8 grid graphics.\n";
+                std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]           : Toggle ANSI terminal colors.\n";
+                std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]       : Toggle board auto-printing after moves.\n";
+                std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]  : View or toggle search heuristic options.\n";
+                std::cout << "  " << style.yellow << "uci" << style.reset << "                        : Switch to UCI engine mode.\n";
                 std::cout << "  " << style.yellow << "quit" << style.reset << " / " << style.yellow << "exit" << style.reset
-                          << "                       : Terminate Bully.\n";
+                          << "                : Terminate Bully.\n";
                 std::cout << style.blue << "========================================================" << style.reset << "\n\n";
             } else {
                 std::cout << "\n=== Bully Interactive CLI Guide ===\n";
