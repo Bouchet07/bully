@@ -474,27 +474,27 @@ bool UCI::execute_line(const std::string& line) {
                     if (is_interactive()) {
                         std::cout << std::format("\n{}=== Position Command Helper ==={}\n", style.blue, style.reset);
                         std::cout << std::format("Usage:\n");
-                        std::cout << std::format("  {}position startpos{}               : Load standard starting chess position.\n", style.yellow, style.reset);
-                        std::cout << std::format("  {}position fen{} {}<FEN>{}            : Load a custom FEN string.\n", style.yellow, style.reset, style.magenta, style.reset);
-                        std::cout << std::format("  {}position{} {}<preset>{}             : Load one of the famous preset positions.\n\n", style.yellow, style.reset, style.green, style.reset);
+                        std::cout << std::format("  {}position startpos{}       : Load standard starting chess position.\n", style.yellow, style.reset);
+                        std::cout << std::format("  {}position fen{} {}<FEN>{}      : Load a custom FEN string.\n", style.yellow, style.reset, style.magenta, style.reset);
+                        std::cout << std::format("  {}position{} {}<preset>{}       : Load one of the famous preset positions.\n\n", style.yellow, style.reset, style.green, style.reset);
                         std::cout << std::format("Available Preset Positions:\n");
-                        std::cout << std::format("  {}kiwipete{} / {}pos2{} : Standard complex test/perft position (KiwiPete).\n", style.green, style.reset, style.green, style.reset);
-                        std::cout << std::format("  {}lasker{}            : Lasker-Reichhelm pawn endgame study.\n", style.green, style.reset);
-                        std::cout << std::format("  {}fools{}             : Fool's Mate setup.\n", style.green, style.reset);
-                        std::cout << std::format("  {}scholars{}          : Scholar's Mate setup.\n", style.green, style.reset);
-                        std::cout << std::format("  {}pos1{}              : Starting position (alias for startpos).\n", style.green, style.reset);
-                        std::cout << std::format("  {}pos3{}              : Perft test position #3.\n", style.green, style.reset);
-                        std::cout << std::format("  {}pos4{}              : Perft test position #4.\n", style.green, style.reset);
-                        std::cout << std::format("  {}pos5{}              : Perft test position #5.\n", style.green, style.reset);
-                        std::cout << std::format("  {}pos6{}              : Perft test position #6.\n", style.green, style.reset);
+                        std::cout << std::format("  {}kiwipete{} / {}pos2{}     : Standard complex test/perft position (KiwiPete).\n", style.green, style.reset, style.green, style.reset);
+                        std::cout << std::format("  {}lasker{}              : Lasker-Reichhelm pawn endgame study.\n", style.green, style.reset);
+                        std::cout << std::format("  {}fools{}               : Fool's Mate setup.\n", style.green, style.reset);
+                        std::cout << std::format("  {}scholars{}            : Scholar's Mate setup.\n", style.green, style.reset);
+                        std::cout << std::format("  {}pos1{}                : Starting position (alias for startpos).\n", style.green, style.reset);
+                        std::cout << std::format("  {}pos3{}                : Perft test position #3.\n", style.green, style.reset);
+                        std::cout << std::format("  {}pos4{}                : Perft test position #4.\n", style.green, style.reset);
+                        std::cout << std::format("  {}pos5{}                : Perft test position #5.\n", style.green, style.reset);
+                        std::cout << std::format("  {}pos6{}                : Perft test position #6.\n", style.green, style.reset);
                         std::cout << std::format("\nNote: You can append '{}moves{} {}e2e4 ...{}' to play moves on top of any position.\n",
                                                  style.green, style.reset, style.magenta, style.reset);
                         std::cout << std::format("{}================================{}\n\n", style.blue, style.reset);
                     } else {
                         std::cout << "Usage:\n";
-                        std::cout << "  position startpos               : Load standard starting chess position.\n";
-                        std::cout << "  position fen <FEN>            : Load a custom FEN string.\n";
-                        std::cout << "  position <preset>             : Load one of the famous preset positions.\n\n";
+                        std::cout << "  position startpos       : Load standard starting chess position.\n";
+                        std::cout << "  position fen <FEN>      : Load a custom FEN string.\n";
+                        std::cout << "  position <preset>       : Load one of the famous preset positions.\n\n";
                         std::cout << "Available Presets: startpos/pos1, kiwipete/pos2, lasker, fools, scholars, pos3, pos4, pos5, pos6\n";
                     }
                 } else {
@@ -967,65 +967,65 @@ bool UCI::execute_line(const std::string& line) {
             if (is_interactive()) {
                 std::cout << "\n" << style.blue << "============= Bully Interactive CLI Guide =============" << style.reset << "\n";
                 std::cout << "  " << style.yellow << "d" << style.reset << " / " << style.yellow << "display" << style.reset
-                          << "         : Visual representation of the active position.\n";
+                          << "                : Visual representation of the active position.\n";
                 std::cout << "  " << style.yellow << "position" << style.reset << " " << style.green << "startpos" << style.reset
-                          << "   : Load standard chess starting position.\n";
+                          << "          : Load standard chess starting position.\n";
                 std::cout << "  " << style.yellow << "position" << style.reset << " " << style.green << "fen" << style.reset << " "
                           << style.magenta << "<FEN>" << style.reset
-                          << "  : Load a FEN string position.\n";
-                std::cout << "                        (Add '" << style.green << "moves" << style.reset << " " << style.magenta << "e2e4 ..." << style.reset << "' to play moves on top).\n";
+                          << "         : Load a FEN string position.\n";
+                std::cout << "                                (Add '" << style.green << "moves" << style.reset << " " << style.magenta << "e2e4 ..." << style.reset << "' to play moves on top).\n";
                 std::cout << "  " << style.yellow << "move" << style.reset << " "
-                          << style.magenta << "<e2e4>" << style.reset << " [" << style.magenta << "e7e5 ..." << style.reset << "] : Play one or more moves on the active board.\n";
+                          << style.magenta << "<e2e4>" << style.reset << " [" << style.magenta << "e7e5 ..." << style.reset << "]        : Play one or more moves on the active board.\n";
                 std::cout << "  " << style.yellow << "go" << style.reset << " [" << style.green << "depth" << style.reset << " "
-                          << style.magenta << "<D>" << style.reset << "] [" << style.green << "ponder" << style.reset << "] : Search (optionally ponder in background) the active position.\n";
-                std::cout << "  " << style.yellow << "ponderhit" << style.reset << "           : Transition a background ponder search into active search.\n";
-                std::cout << "  " << style.yellow << "stop" << style.reset << "                : Abort a running search.\n";
-                std::cout << "  " << style.yellow << "eval" << style.reset << "                : Print detailed static evaluation breakdown.\n";
+                          << style.magenta << "<D>" << style.reset << "] [" << style.green << "ponder" << style.reset << "]        : Search (optionally ponder in background) the active position.\n";
+                std::cout << "  " << style.yellow << "ponderhit" << style.reset << "                  : Transition a background ponder search into active search.\n";
+                std::cout << "  " << style.yellow << "stop" << style.reset << "                       : Abort a running search.\n";
+                std::cout << "  " << style.yellow << "eval" << style.reset << "                       : Print detailed static evaluation breakdown.\n";
                 std::cout << "  " << style.yellow << "perft" << style.reset << " "
                           << style.magenta << "<depth>" << style.reset
-                          << "       : Measure speed & count leaf nodes recursively.\n";
+                          << "              : Measure speed & count leaf nodes recursively.\n";
                 std::cout << "  " << style.yellow << "divide" << style.reset << " "
                           << style.magenta << "<depth>" << style.reset
-                          << "      : Print move-by-move node counts (divide test).\n";
+                          << "             : Print move-by-move node counts (divide test).\n";
                 std::cout << "  " << style.yellow << "hash" << style.reset << " "
                           << style.magenta << "<MB>" << style.reset
-                          << "           : Resize transposition table (in Megabytes).\n";
+                          << "                  : Resize transposition table (in Megabytes).\n";
                 std::cout << "  " << style.yellow << "threads" << style.reset << " "
                           << style.magenta << "<count>" << style.reset
-                          << "     : Set the number of search threads.\n";
+                          << "            : Set the number of search threads.\n";
                 std::cout << "  " << style.yellow << "multipv" << style.reset << " "
                           << style.magenta << "<count>" << style.reset
-                          << "     : Set the number of PV lines to show in search.\n";
-                std::cout << "  " << style.yellow << "utf8" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]     : Toggle UTF-8 grid graphics.\n";
-                std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]    : Toggle ANSI terminal colors.\n";
-                std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "] : Toggle board auto-printing after moves.\n";
-                std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]] : View or toggle search heuristic options.\n";
-                std::cout << "  " << style.yellow << "uci" << style.reset << "                 : Switch to UCI engine mode.\n";
+                          << "            : Set the number of PV lines to show in search.\n";
+                std::cout << "  " << style.yellow << "utf8" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]            : Toggle UTF-8 grid graphics.\n";
+                std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]           : Toggle ANSI terminal colors.\n";
+                std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]        : Toggle board auto-printing after moves.\n";
+                std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]    : View or toggle search heuristic options.\n";
+                std::cout << "  " << style.yellow << "uci" << style.reset << "                        : Switch to UCI engine mode.\n";
                 std::cout << "  " << style.yellow << "quit" << style.reset << " / " << style.yellow << "exit" << style.reset
-                          << "         : Terminate Bully.\n";
+                          << "                : Terminate Bully.\n";
                 std::cout << style.blue << "========================================================" << style.reset << "\n\n";
             } else {
                 std::cout << "\n=== Bully Interactive CLI Guide ===\n";
-                std::cout << "  d / display         : Visual representation of the active position.\n";
-                std::cout << "  position startpos   : Load standard chess starting position.\n";
-                std::cout << "  position fen <FEN>  : Load a FEN string position.\n";
-                std::cout << "                        (Add 'moves e2e4 ...' to play moves on top).\n";
-                std::cout << "  move <e2e4> [e7e5 ...] : Play one or more moves on the active board.\n";
-                std::cout << "  go [depth <D>] [ponder] : Search (optionally ponder in background) the active position.\n";
-                std::cout << "  ponderhit           : Transition a background ponder search into active search.\n";
-                std::cout << "  stop                : Abort a running search.\n";
-                std::cout << "  eval                : Print detailed static evaluation breakdown.\n";
-                std::cout << "  perft <depth>       : Measure speed & count leaf nodes recursively.\n";
-                std::cout << "  divide <depth>      : Print move-by-move node counts (divide test).\n";
-                std::cout << "  hash <MB>           : Resize transposition table (in Megabytes).\n";
-                std::cout << "  threads <count>     : Set the number of search threads.\n";
-                std::cout << "  multipv <count>     : Set the number of PV lines to show in search.\n";
-                std::cout << "  utf8 [on | off]     : Toggle UTF-8 grid graphics.\n";
-                std::cout << "  color [on | off]    : Toggle ANSI terminal colors.\n";
-                std::cout << "  autoprint [on | off]: Toggle board auto-printing after moves.\n";
-                std::cout << "  options [name [on|off]]: View or toggle search heuristic options.\n";
-                std::cout << "  uci                 : Switch to UCI engine mode.\n";
-                std::cout << "  quit / exit         : Terminate Bully.\n";
+                std::cout << "  d / display                 : Visual representation of the active position.\n";
+                std::cout << "  position startpos           : Load standard chess starting position.\n";
+                std::cout << "  position fen <FEN>          : Load a FEN string position.\n";
+                std::cout << "                                (Add 'moves e2e4 ...' to play moves on top).\n";
+                std::cout << "  move <e2e4> [e7e5 ...]      : Play one or more moves on the active board.\n";
+                std::cout << "  go [depth <D>] [ponder]     : Search (optionally ponder in background) the active position.\n";
+                std::cout << "  ponderhit                   : Transition a background ponder search into active search.\n";
+                std::cout << "  stop                        : Abort a running search.\n";
+                std::cout << "  eval                        : Print detailed static evaluation breakdown.\n";
+                std::cout << "  perft <depth>               : Measure speed & count leaf nodes recursively.\n";
+                std::cout << "  divide <depth>              : Print move-by-move node counts (divide test).\n";
+                std::cout << "  hash <MB>                   : Resize transposition table (in Megabytes).\n";
+                std::cout << "  threads <count>             : Set the number of search threads.\n";
+                std::cout << "  multipv <count>             : Set the number of PV lines to show in search.\n";
+                std::cout << "  utf8 [on | off]             : Toggle UTF-8 grid graphics.\n";
+                std::cout << "  color [on | off]            : Toggle ANSI terminal colors.\n";
+                std::cout << "  autoprint [on | off]        : Toggle board auto-printing after moves.\n";
+                std::cout << "  options [name [on | off]]   : View or toggle search heuristic options.\n";
+                std::cout << "  uci                         : Switch to UCI engine mode.\n";
+                std::cout << "  quit / exit                 : Terminate Bully.\n";
                 std::cout << "====================================\n\n";
             }
         }
