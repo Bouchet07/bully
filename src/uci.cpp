@@ -100,12 +100,20 @@ void UCI::init() {
 
     if (is_interactive()) {
         std::cout << style.blue << "========================================================\n" << style.reset;
-        std::cout << style.cyan << " ██████╗  ██╗   ██╗ ██╗      ██╗   ██╗   ██╗\n";
-        std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║   ╚██╗ ██╔╝\n";
-        std::cout << " ██████╔╝ ██║   ██║ ██║      ██║    ╚████╔╝ \n";
-        std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║     ╚██╔╝  \n";
-        std::cout << " ██████╔╝ ╚██████╔╝ ███████╗ ███████╗ ██║   \n";
-        std::cout << " ╚═════╝   ╚═════╝  ╚══════╝ ╚══════╝ ╚═╝   \n" << style.reset;
+        if (use_utf8) {
+            std::cout << style.cyan << " ██████╗  ██╗   ██╗ ██╗      ██╗   ██╗   ██╗\n";
+            std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║   ╚██╗ ██╔╝\n";
+            std::cout << " ██████╔╝ ██║   ██║ ██║      ██║    ╚████╔╝ \n";
+            std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║     ╚██╔╝  \n";
+            std::cout << " ██████╔╝ ╚██████╔╝ ███████╗ ███████╗ ██║   \n";
+            std::cout << " ╚═════╝   ╚═════╝  ╚══════╝ ╚══════╝ ╚═╝   \n" << style.reset;
+        } else {
+            std::cout << style.cyan << "  ____  _   _ _     _    __   __ \n";
+            std::cout << " |  _ \\| | | | |   | |   \\ \\ / / \n";
+            std::cout << " | |_) | | | | |   | |    \\ V /  \n";
+            std::cout << " |  _ <| |_| | |___| |___  | |   \n";
+            std::cout << " |____/ \\___/|_____|_____| |_|   \n\n" << style.reset;
+        }
         std::cout << style.blue << "========================================================\n" << style.reset;
         std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
         std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
