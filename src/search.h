@@ -39,6 +39,11 @@ extern bool use_rfp;
 extern bool use_lmp;
 extern bool use_fp;
 extern bool use_check_extensions;
+extern bool use_aspiration_window;
+extern bool use_quiescence;
+extern bool use_tt;
+extern bool use_killers;
+extern bool use_history;
 
 // Statistics and timing tracking for the active search
 struct SearchState {

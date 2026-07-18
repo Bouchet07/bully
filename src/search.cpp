@@ -29,6 +29,11 @@ bool use_rfp = true;
 bool use_lmp = true;
 bool use_fp = true;
 bool use_check_extensions = true;
+bool use_aspiration_window = true;
+bool use_quiescence = true;
+bool use_tt = true;
+bool use_killers = true;
+bool use_history = true;
 static std::thread controller_thread;
 
 // LMR reductions table
@@ -123,11 +128,16 @@ static int score_move(Move m, Move tt_move, const Position& pos, int ply, const 
         return 900000 + get_piece_value(type_of(victim)) * 10 - get_piece_value(type_of(attacker));
     }
 
-    if (m == heuristics.killer1[static_cast<size_t>(ply)]) return 80000;
-    if (m == heuristics.killer2[static_cast<size_t>(ply)]) return 70000;
+    if (use_killers) {
+        if (m == heuristics.killer1[static_cast<size_t>(ply)]) return 80000;
+        if (m == heuristics.killer2[static_cast<size_t>(ply)]) return 70000;
+    }
 
-    Piece pc = pos.piece_on(m.from_sq());
-    return heuristics.history[to_index(pc)][to_index(m.to_sq())];
+    if (use_history) {
+        Piece pc = pos.piece_on(m.from_sq());
+        return heuristics.history[to_index(pc)][to_index(m.to_sq())];
+    }
+    return 0;
 }
 
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
@@ -228,7 +238,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     if (depth <= 0) {
-        return quiescence(pos, alpha, beta, ply, ss, heuristics);
+        return use_quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : Eval::evaluate(pos);
     }
 
     ss.seldepth = std::max(ss.seldepth, ply);
@@ -240,7 +250,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     int tt_depth = -1;
     Bound tt_bound = BOUND_NONE;
 
-    if (TT.probe(pos.key(), tt_move, tt_score, tt_eval, tt_depth, tt_bound, ply)) {
+    if (use_tt && TT.probe(pos.key(), tt_move, tt_score, tt_eval, tt_depth, tt_bound, ply)) {
         if (tt_depth >= depth) {
             if (tt_bound == BOUND_EXACT) return tt_score;
             if (tt_bound == BOUND_UPPER && tt_score <= alpha) return alpha;
@@ -394,20 +404,24 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             bound_type = BOUND_LOWER;
             
             if (!is_cap) {
-                size_t p_idx = static_cast<size_t>(ply);
-                if (heuristics.killer1[p_idx] != m) {
-                    heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
-                    heuristics.killer1[p_idx] = m;
+                if (use_killers) {
+                    size_t p_idx = static_cast<size_t>(ply);
+                    if (heuristics.killer1[p_idx] != m) {
+                        heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
+                        heuristics.killer1[p_idx] = m;
+                    }
                 }
-                Piece pc = pos.piece_on(m.from_sq());
-                heuristics.history[to_index(pc)][to_index(m.to_sq())] += depth * depth;
+                if (use_history) {
+                    Piece pc = pos.piece_on(m.from_sq());
+                    heuristics.history[to_index(pc)][to_index(m.to_sq())] += depth * depth;
 
-                // Penalize other quiet moves that failed to cause a cutoff
-                for (int q = 0; q < quiet_count; ++q) {
-                    Move qm = quiet_moves[static_cast<size_t>(q)];
-                    if (qm != m) {
-                        Piece qpc = pos.piece_on(qm.from_sq());
-                        heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= depth * depth;
+                    // Penalize other quiet moves that failed to cause a cutoff
+                    for (int q = 0; q < quiet_count; ++q) {
+                        Move qm = quiet_moves[static_cast<size_t>(q)];
+                        if (qm != m) {
+                            Piece qpc = pos.piece_on(qm.from_sq());
+                            heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= depth * depth;
+                        }
                     }
                 }
             }
@@ -423,7 +437,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
-    TT.save(pos.key(), best_move, best_score, Eval::evaluate(pos), depth, bound_type, ply);
+    if (use_tt) {
+        TT.save(pos.key(), best_move, best_score, Eval::evaluate(pos), depth, bound_type, ply);
+    }
 
     return best_score;
 }
@@ -693,7 +709,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             Value beta = VALUE_INFINITE;
             int delta = 35;
 
-            if (d >= 5) {
+            if (use_aspiration_window && d >= 5) {
                 alpha = static_cast<Value>(std::max(static_cast<int>(last_score) - delta, -static_cast<int>(VALUE_INFINITE)));
                 beta = static_cast<Value>(std::min(static_cast<int>(last_score) + delta, static_cast<int>(VALUE_INFINITE)));
             }

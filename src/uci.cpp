@@ -306,6 +306,61 @@ bool UCI::execute_line(const std::string& line) {
                         }
                     }
                 }
+                else if (option_name == "AspirationWindow") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_aspiration_window = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("AspirationWindow set to {}.\n", Search::use_aspiration_window);
+                        }
+                    }
+                }
+                else if (option_name == "QuiescenceSearch") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_quiescence = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("QuiescenceSearch set to {}.\n", Search::use_quiescence);
+                        }
+                    }
+                }
+                else if (option_name == "UseTT") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_tt = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("UseTT set to {}.\n", Search::use_tt);
+                        }
+                    }
+                }
+                else if (option_name == "KillerHeuristic") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_killers = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("KillerHeuristic set to {}.\n", Search::use_killers);
+                        }
+                    }
+                }
+                else if (option_name == "HistoryHeuristic") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_history = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("HistoryHeuristic set to {}.\n", Search::use_history);
+                        }
+                    }
+                }
                 else if (option_name == "Ponder") {
                     std::string value_keyword;
                     is >> value_keyword; // "value"
@@ -743,6 +798,11 @@ bool UCI::execute_line(const std::string& line) {
                         else if (opt_name == "lmp") Search::use_lmp = enabled;
                         else if (opt_name == "fp")  Search::use_fp  = enabled;
                         else if (opt_name == "ce")  Search::use_check_extensions = enabled;
+                        else if (opt_name == "aw")  Search::use_aspiration_window = enabled;
+                        else if (opt_name == "qs")  Search::use_quiescence = enabled;
+                        else if (opt_name == "tt")  Search::use_tt = enabled;
+                        else if (opt_name == "kh")  Search::use_killers = enabled;
+                        else if (opt_name == "hh")  Search::use_history = enabled;
                         else valid = false;
 
                         if (valid) {
@@ -770,6 +830,11 @@ bool UCI::execute_line(const std::string& line) {
                     else if (opt_name == "lmp") enabled = Search::use_lmp;
                     else if (opt_name == "fp")  enabled = Search::use_fp;
                     else if (opt_name == "ce")  enabled = Search::use_check_extensions;
+                    else if (opt_name == "aw")  enabled = Search::use_aspiration_window;
+                    else if (opt_name == "qs")  enabled = Search::use_quiescence;
+                    else if (opt_name == "tt")  enabled = Search::use_tt;
+                    else if (opt_name == "kh")  enabled = Search::use_killers;
+                    else if (opt_name == "hh")  enabled = Search::use_history;
                     else valid = false;
 
                     if (valid) {
@@ -802,6 +867,16 @@ bool UCI::execute_line(const std::string& line) {
                               << style.magenta << (Search::use_fp ? "ON" : "OFF") << style.reset << "\n";
                     std::cout << "  " << style.green << "CheckExtensions" << style.reset << " (" << style.magenta << "ce" << style.reset << ")           : "
                               << style.magenta << (Search::use_check_extensions ? "ON" : "OFF") << style.reset << "\n";
+                    std::cout << "  " << style.green << "AspirationWindow" << style.reset << " (" << style.magenta << "aw" << style.reset << ")          : "
+                              << style.magenta << (Search::use_aspiration_window ? "ON" : "OFF") << style.reset << "\n";
+                    std::cout << "  " << style.green << "QuiescenceSearch" << style.reset << " (" << style.magenta << "qs" << style.reset << ")          : "
+                              << style.magenta << (Search::use_quiescence ? "ON" : "OFF") << style.reset << "\n";
+                    std::cout << "  " << style.green << "UseTT" << style.reset << " (" << style.magenta << "tt" << style.reset << ")                     : "
+                              << style.magenta << (Search::use_tt ? "ON" : "OFF") << style.reset << "\n";
+                    std::cout << "  " << style.green << "KillerHeuristic" << style.reset << " (" << style.magenta << "kh" << style.reset << ")          : "
+                              << style.magenta << (Search::use_killers ? "ON" : "OFF") << style.reset << "\n";
+                    std::cout << "  " << style.green << "HistoryHeuristic" << style.reset << " (" << style.magenta << "hh" << style.reset << ")         : "
+                              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n";
                     std::cout << "  " << style.green << "Usage" << style.reset << ": "
                               << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]"
                               << "  (e.g., " << style.yellow << "options" << style.reset << " " << style.magenta << "lmr" << style.reset << " " << style.green << "off" << style.reset << ")\n";
@@ -814,6 +889,11 @@ bool UCI::execute_line(const std::string& line) {
                     std::cout << "  LateMovePruning (lmp)          : " << (Search::use_lmp ? "ON" : "OFF") << "\n";
                     std::cout << "  FutilityPruning (fp)           : " << (Search::use_fp ? "ON" : "OFF") << "\n";
                     std::cout << "  CheckExtensions (ce)           : " << (Search::use_check_extensions ? "ON" : "OFF") << "\n";
+                    std::cout << "  AspirationWindow (aw)          : " << (Search::use_aspiration_window ? "ON" : "OFF") << "\n";
+                    std::cout << "  QuiescenceSearch (qs)          : " << (Search::use_quiescence ? "ON" : "OFF") << "\n";
+                    std::cout << "  UseTT (tt)                     : " << (Search::use_tt ? "ON" : "OFF") << "\n";
+                    std::cout << "  KillerHeuristic (kh)           : " << (Search::use_killers ? "ON" : "OFF") << "\n";
+                    std::cout << "  HistoryHeuristic (hh)          : " << (Search::use_history ? "ON" : "OFF") << "\n";
                     std::cout << "  Usage: options [name [on|off]] (e.g., options lmr off)\n";
                     std::cout << "=======================================\n\n";
                 }
