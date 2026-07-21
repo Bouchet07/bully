@@ -632,10 +632,53 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 root_moves[i].score = score;
 
                 std::string pv_str = m.to_string();
+                Position pv_pos = pos;
+                std::vector<StateInfo> pv_history;
+                pv_history.reserve(static_cast<size_t>(d));
+                StateInfo first_si;
+                pv_pos.make_move(m, first_si);
+
                 int child_len = main_worker->ss.pv_length[1];
-                for (int j = 0; j < child_len; ++j) {
-                    pv_str += " " + main_worker->ss.pv_table[1][static_cast<size_t>(j)].to_string();
+                int current_depth = 1;
+
+                for (int j = 0; j < child_len && current_depth < d; ++j) {
+                    Move child_m = main_worker->ss.pv_table[1][static_cast<size_t>(j)];
+                    if (child_m == Move::none() || !child_m.is_ok()) break;
+
+                    pv_str += " " + child_m.to_string();
+                    pv_history.emplace_back();
+                    if (!pv_pos.make_move(child_m, pv_history.back())) break;
+                    current_depth++;
                 }
+
+                while (current_depth < d) {
+                    Move next_pv_move = Move::none();
+                    Value dummy_score, dummy_eval;
+                    int dummy_depth;
+                    Bound dummy_bound;
+
+                    if (!TT.probe(pv_pos.key(), next_pv_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)
+                        || next_pv_move == Move::none() || !next_pv_move.is_ok()) {
+                        break;
+                    }
+
+                    MoveList legal_list;
+                    legal_list.generate(pv_pos);
+                    bool legal = false;
+                    for (size_t l = 0; l < legal_list.size(); ++l) {
+                        if (legal_list[l].move == next_pv_move) {
+                            legal = true;
+                            break;
+                        }
+                    }
+                    if (!legal) break;
+
+                    pv_str += " " + next_pv_move.to_string();
+                    pv_history.emplace_back();
+                    if (!pv_pos.make_move(next_pv_move, pv_history.back())) break;
+                    current_depth++;
+                }
+
                 root_moves[i].pv_str = pv_str;
 
                 std::sort(root_moves.begin(), root_moves.begin() + static_cast<ptrdiff_t>(i + 1), [](const RootMove& a, const RootMove& b) {
@@ -750,30 +793,49 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             double nps = (secs > 0.0) ? (static_cast<double>(total_nodes) / secs) : 0.0;
 
             std::string pv_str;
+            Position pv_pos = pos;
+            std::vector<StateInfo> pv_history;
+            pv_history.reserve(static_cast<size_t>(d));
+
             int pv_len = main_worker->ss.pv_length[0];
-            if (pv_len > 0) {
-                for (int j = 0; j < pv_len; ++j) {
-                    pv_str += (j == 0 ? "" : " ") + main_worker->ss.pv_table[0][static_cast<size_t>(j)].to_string();
-                }
-            } else {
-                Position pv_pos = pos;
-                std::vector<StateInfo> pv_history;
-                pv_history.reserve(static_cast<size_t>(d));
-                Move next_pv_move = best_move;
+            int current_depth = 0;
+
+            for (int j = 0; j < pv_len && current_depth < d; ++j) {
+                Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
+                if (m == Move::none() || !m.is_ok()) break;
+
+                pv_str += (pv_str.empty() ? "" : " ") + m.to_string();
+                pv_history.emplace_back();
+                if (!pv_pos.make_move(m, pv_history.back())) break;
+                current_depth++;
+            }
+
+            while (current_depth < d) {
+                Move next_pv_move = Move::none();
                 Value dummy_score, dummy_eval;
                 int dummy_depth;
                 Bound dummy_bound;
 
-                for (int pv_depth = 0; pv_depth < d && next_pv_move != Move::none(); ++pv_depth) {
-                    pv_str += (pv_str.empty() ? "" : " ") + next_pv_move.to_string();
-                    pv_history.emplace_back();
-                    if (!pv_pos.make_move(next_pv_move, pv_history.back())) {
+                if (!TT.probe(pv_pos.key(), next_pv_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)
+                    || next_pv_move == Move::none() || !next_pv_move.is_ok()) {
+                    break;
+                }
+
+                MoveList legal_list;
+                legal_list.generate(pv_pos);
+                bool legal = false;
+                for (size_t l = 0; l < legal_list.size(); ++l) {
+                    if (legal_list[l].move == next_pv_move) {
+                        legal = true;
                         break;
                     }
-                    Move inner_best = Move::none();
-                    TT.probe(pv_pos.key(), inner_best, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
-                    next_pv_move = inner_best;
                 }
+                if (!legal) break;
+
+                pv_str += (pv_str.empty() ? "" : " ") + next_pv_move.to_string();
+                pv_history.emplace_back();
+                if (!pv_pos.make_move(next_pv_move, pv_history.back())) break;
+                current_depth++;
             }
 
             if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
