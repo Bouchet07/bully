@@ -848,10 +848,6 @@ bool UCI::execute_line(const std::string& line) {
                         else if (opt_name == "tt")  Search::use_tt = enabled;
                         else if (opt_name == "kh")  Search::use_killers = enabled;
                         else if (opt_name == "hh")  Search::use_history = enabled;
-                        else if (opt_name == "tb" || opt_name == "syzygy" || opt_name == "SyzygyTablebases") {
-                            if (enabled) Syzygy::init(Syzygy::path.empty() ? "syzygy" : Syzygy::path);
-                            else Syzygy::init("");
-                        }
                         else valid = false;
 
                         if (valid) {
@@ -884,7 +880,6 @@ bool UCI::execute_line(const std::string& line) {
                     else if (opt_name == "tt")  enabled = Search::use_tt;
                     else if (opt_name == "kh")  enabled = Search::use_killers;
                     else if (opt_name == "hh")  enabled = Search::use_history;
-                    else if (opt_name == "tb" || opt_name == "syzygy") enabled = (Syzygy::max_cardinality > 0);
                     else valid = false;
 
                     if (valid) {
@@ -926,9 +921,7 @@ bool UCI::execute_line(const std::string& line) {
                     std::cout << "  " << style.green << "KillerHeuristic" << style.reset << " (" << style.magenta << "kh" << style.reset << ")           : "
                               << style.magenta << (Search::use_killers ? "ON" : "OFF") << style.reset << "\n";
                     std::cout << "  " << style.green << "HistoryHeuristic" << style.reset << " (" << style.magenta << "hh" << style.reset << ")          : "
-                              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n";
-                    std::cout << "  " << style.green << "SyzygyTablebases" << style.reset << " (" << style.magenta << "tb" << style.reset << ")          : "
-                              << style.magenta << (Syzygy::max_cardinality > 0 ? "ON" : "OFF") << style.reset << "\n\n";
+                              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n\n";
                     std::cout << "  " << style.green << "Usage" << style.reset << ": "
                               << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]"
                               << "  (e.g., " << style.yellow << "options" << style.reset << " " << style.magenta << "lmr" << style.reset << " " << style.green << "off" << style.reset << ")\n";
@@ -946,7 +939,6 @@ bool UCI::execute_line(const std::string& line) {
                     std::cout << "  UseTT (tt)                     : " << (Search::use_tt ? "ON" : "OFF") << "\n";
                     std::cout << "  KillerHeuristic (kh)           : " << (Search::use_killers ? "ON" : "OFF") << "\n";
                     std::cout << "  HistoryHeuristic (hh)          : " << (Search::use_history ? "ON" : "OFF") << "\n";
-                    std::cout << "  SyzygyTablebases (tb)          : " << (Syzygy::max_cardinality > 0 ? "ON" : "OFF") << "\n";
                     std::cout << "  \nUsage: options [name [on|off]] (e.g., options lmr off)\n";
                     std::cout << "=======================================\n\n";
                 }
