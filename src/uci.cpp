@@ -1045,7 +1045,7 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]           : Toggle ANSI terminal colors.\n";
                 std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]       : Toggle board auto-printing after moves.\n";
                 std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]  : View or toggle search heuristic options.\n";
-                std::cout << "  " << style.yellow << "syzygy" << style.reset << " [" << style.magenta << "<path>" << style.reset << "|" << style.green << "on" << style.reset << "|" << style.green << "off" << style.reset << "]        : View or set Syzygy tablebases path & state.\n";
+                std::cout << "  " << style.yellow << "syzygy" << style.reset << " [" << style.magenta << "<path>" << style.reset << "|" << style.green << "on" << style.reset << "|" << style.green << "off" << style.reset << "]     : View or set Syzygy tablebases path & state.\n";
                 std::cout << "  " << style.yellow << "uci" << style.reset << "                        : Switch to UCI engine mode.\n";
                 std::cout << "  " << style.yellow << "quit" << style.reset << " / " << style.yellow << "exit" << style.reset
                           << "                : Terminate Bully.\n";
@@ -1066,14 +1066,43 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << "  hash <MB>                           : Resize transposition table (in Megabytes).\n";
                 std::cout << "  threads <count>                     : Set the number of search threads.\n";
                 std::cout << "  multipv <count>                     : Set the number of PV lines to show in search.\n";
-                std::cout << "  utf8 [on | off]                     : Toggle UTF-8 grid graphics.\n";
-                std::cout << "  color [on | off]                    : Toggle ANSI terminal colors.\n";
-                std::cout << "  autoprint [on | off]                : Toggle board auto-printing after moves.\n";
-                std::cout << "  options [name [on | off]]           : View or toggle search heuristic options.\n";
+                std::cout << "  utf8 [on|off]                       : Toggle UTF-8 grid graphics.\n";
+                std::cout << "  color [on|off]                      : Toggle ANSI terminal colors.\n";
+                std::cout << "  autoprint [on|off]                  : Toggle board auto-printing after moves.\n";
+                std::cout << "  options [name [on|off]]             : View or toggle search heuristic options.\n";
                 std::cout << "  syzygy [<path>|on|off]              : View or set Syzygy tablebases path & state.\n";
                 std::cout << "  uci                                 : Switch to UCI engine mode.\n";
                 std::cout << "  quit / exit                         : Terminate Bully.\n";
-                std::cout << "====================================\n\n";
+                std::cout << "===================================\n\n";
+            }
+        }
+        else if (token == "syzygy") {
+            std::string sub;
+            if (is >> sub) {
+                if (sub == "on") {
+                    Syzygy::init(Syzygy::path.empty() ? "syzygy" : Syzygy::path);
+                } else if (sub == "off" || sub == "clear") {
+                    Syzygy::init("");
+                } else if (sub == "path") {
+                    std::string p;
+                    if (is >> p) {
+                        Syzygy::init(p);
+                    }
+                } else {
+                    Syzygy::init(sub);
+                }
+            } else {
+                if (is_interactive()) {
+                    if (Syzygy::max_cardinality > 0) {
+                        std::cout << std::format("Syzygy Tablebases : {}{}{} (max {} pieces) from '{}{}{}'\n",
+                                                 style.magenta, "ON", style.reset, Syzygy::max_cardinality,
+                                                 style.green, Syzygy::path, style.reset);
+                    } else {
+                        std::cout << std::format("Syzygy Tablebases : {}{}{}\n", style.magenta, "OFF", style.reset);
+                    }
+                } else {
+                    std::cout << std::format("syzygy {} max_pieces {}\n", Syzygy::path, Syzygy::max_cardinality);
+                }
             }
         }
         else if (token == "quit" || token == "exit") {
