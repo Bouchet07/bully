@@ -13,6 +13,7 @@
 #include "movegen.h"
 #include "bitboard.h"
 #include "evaluation.h"
+#include "syzygy.h"
 
 namespace Bully {
 namespace Search {
@@ -235,6 +236,13 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     if (ply > 0 && (is_repetition(pos) || pos.rule50() >= 100)) {
         return VALUE_DRAW;
+    }
+
+    if (ply > 0 && Syzygy::max_cardinality > 0) {
+        Value tb_val = Syzygy::probe_wdl(pos);
+        if (tb_val != VALUE_NONE) {
+            return tb_val;
+        }
     }
 
     if (depth <= 0) {
@@ -496,6 +504,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     auto start_time = std::chrono::steady_clock::now();
     search_start_time_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count(), std::memory_order_relaxed);
     int time_limit = -1;
+    Move best_move = Move::none();
 
     // Time budget allocation
     if (limits.time_controlled()) {
@@ -518,6 +527,17 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 time_limit = 10;
             }
         }
+    }
+
+    // Syzygy Root DTZ Probing
+    Move best_tb_move = Move::none();
+    Value tb_score = VALUE_NONE;
+    if (Syzygy::probe_root(pos, best_tb_move, tb_score)) {
+        best_move = best_tb_move;
+        int cp_score = (tb_score > 0 ? 10000 : (tb_score < 0 ? -10000 : 0));
+        std::cout << std::format("info depth 1 seldepth 1 score cp {} nodes 1 nps 0 time 0 pv {}\n", cp_score, best_move.to_string());
+        std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+        return;
     }
 
     int threads_to_spawn = num_threads;
@@ -560,7 +580,6 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     // 3. Run main thread (id = 0) in the controller thread
     SearchWorker* main_worker = workers[0].get();
     int max_search_depth = (limits.depth != -1) ? limits.depth : MAX_PLY;
-    Move best_move = Move::none();
 
     struct RootMove {
         Move move = Move::none();

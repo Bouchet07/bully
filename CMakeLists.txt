@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Bully CXX)
+project(Bully C CXX)
 
 # Require C++23 standard
 set(CMAKE_CXX_STANDARD 23)
@@ -26,6 +26,8 @@ set(ENGINE_SOURCES
     src/search.cpp
     src/evaluation.cpp
     src/uci.cpp
+    src/syzygy.cpp
+    Pyrrhic/tbprobe.c
 )
 
 set(ENGINE_HEADERS
@@ -38,11 +40,16 @@ set(ENGINE_HEADERS
     src/search.h
     src/evaluation.h
     src/uci.h
+    src/syzygy.h
 )
 
 # Define static library for the engine to share with the executable and tests
 add_library(engine_lib STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
-target_include_directories(engine_lib PUBLIC src)
+set_source_files_properties(Pyrrhic/tbprobe.c PROPERTIES 
+    LANGUAGE CXX
+    COMPILE_FLAGS "-w"
+)
+target_include_directories(engine_lib PUBLIC src Pyrrhic)
 
 # ============================================================================
 # Professional Build Architecture Configurations
@@ -67,13 +74,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     )
 
     if(BULLY_ARCH STREQUAL "native")
-        list(APPEND ARCH_FLAGS -march=native -mbmi2)
+        list(APPEND ARCH_FLAGS -march=native)
         set(BINARY_SUFFIX "-native")
     elseif(BULLY_ARCH STREQUAL "bmi2")
         list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
         set(BINARY_SUFFIX "-bmi2")
     elseif(BULLY_ARCH STREQUAL "avx2")
-        list(APPEND ARCH_FLAGS -march=x86-64-v3) # Has AVX2 but excludes -mbmi2 (forces magic fallback)
+        list(APPEND ARCH_FLAGS -march=x86-64-v3 -mno-bmi2) # Has AVX2 but disables BMI2 (forces magic fallback)
         set(BINARY_SUFFIX "-avx2")
     elseif(BULLY_ARCH STREQUAL "modern")
         list(APPEND ARCH_FLAGS -march=x86-64-v2) # SSE4.2 + POPCNT
@@ -84,11 +91,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set(BINARY_SUFFIX "")
     endif()
 
-    target_compile_options(engine_lib PRIVATE ${ARCH_FLAGS})
+    target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 
-    # If BMI2 was enabled, ensure public dependency compiles with -mbmi2
-    if(BULLY_ARCH STREQUAL "native" OR BULLY_ARCH STREQUAL "bmi2")
+    # If BMI2 was enabled, ensure public dependency compiles with -mbmi2 and defines USE_PEXT
+    if(BULLY_ARCH STREQUAL "bmi2")
         target_compile_options(engine_lib PUBLIC -mbmi2)
+        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
     endif()
 
 elseif(MSVC)
@@ -103,6 +111,7 @@ elseif(MSVC)
 
     if(BULLY_ARCH STREQUAL "native" OR BULLY_ARCH STREQUAL "bmi2")
         list(APPEND ARCH_FLAGS /arch:AVX2) # On MSVC, AVX2 targets BMI2
+        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
         set(BINARY_SUFFIX "-bmi2")
     elseif(BULLY_ARCH STREQUAL "avx2")
         list(APPEND ARCH_FLAGS /arch:AVX2)
@@ -113,7 +122,7 @@ elseif(MSVC)
         set(BINARY_SUFFIX "")
     endif()
 
-    target_compile_options(engine_lib PRIVATE ${ARCH_FLAGS})
+    target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 endif()
 
 # Create the main executable
@@ -146,6 +155,7 @@ if(BUILD_TESTS)
         tests/test_position.cpp
         tests/test_movegen.cpp
         tests/test_tt.cpp
+        tests/test_evaluation.cpp
     )
     
     add_executable(tests ${TEST_SOURCES})

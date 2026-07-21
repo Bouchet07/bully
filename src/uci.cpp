@@ -24,6 +24,7 @@
 #include "tt.h"
 #include "search.h"
 #include "evaluation.h"
+#include "syzygy.h"
 
 namespace Bully {
 
@@ -89,8 +90,9 @@ void UCI::init() {
     }
 #endif
 
-    // Initialize starting position and TT first so sizes are resolved
+    // Initialize starting position, TT, and Syzygy tablebases
     TT.resize(16);
+    Syzygy::init("syzygy");
     history.emplace_back();
     pos.set_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", history.back());
 
@@ -239,6 +241,14 @@ bool UCI::execute_line(const std::string& line) {
                         if (is_interactive()) {
                             std::cout << std::format("Threads count set to {} (input: {}).\n", threads, val);
                         }
+                    }
+                }
+                else if (option_name == "SyzygyPath") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string path_val;
+                    if (is >> path_val) {
+                        Syzygy::init(path_val);
                     }
                 }
                 else if (option_name == "MultiPV") {
