@@ -27,6 +27,9 @@ private:
     // Run recursive Perft from the active position
     uint64_t run_perft(int depth);
 
+    // Run divide test from the active position
+    void run_divide(int depth, bool is_go_cmd);
+
     // Parse move string (e.g. "e2e4") to a legal Move object
     Move parse_move(const std::string& move_str);
 

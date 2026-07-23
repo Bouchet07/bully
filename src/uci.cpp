@@ -523,21 +523,7 @@ bool UCI::execute_line(const std::string& line) {
             }
 
             if (is_go_perft) {
-                if (perft_depth < 1) perft_depth = 1;
-                MoveList list;
-                list.generate(pos);
-                uint64_t total = 0;
-                for (size_t i = 0; i < list.size(); ++i) {
-                    Move m = list[i].move;
-                    StateInfo next_si;
-                    if (pos.make_move(m, next_si)) {
-                        uint64_t subnodes = run_perft(perft_depth - 1);
-                        std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
-                        total += subnodes;
-                    }
-                    pos.unmake_move(m);
-                }
-                std::cout << std::format("\nNodes searched: {}\n", total);
+                run_divide(perft_depth, true);
             } else {
                 // Print execution metadata
                 int cores = static_cast<int>(std::thread::hardware_concurrency());
@@ -836,35 +822,7 @@ bool UCI::execute_line(const std::string& line) {
         else if (token == "divide") {
             int depth = 1;
             is >> depth;
-            if (depth < 1) depth = 1;
-
-            if (is_interactive()) {
-                std::cout << std::format("Divide depth {}{}{}...\n", style.magenta, depth, style.reset);
-            } else {
-                std::cout << std::format("Divide depth {}...\n", depth);
-            }
-            MoveList list;
-            list.generate(pos);
-            uint64_t total = 0;
-            for (size_t i = 0; i < list.size(); ++i) {
-                Move m = list[i].move;
-                StateInfo next_si;
-                if (pos.make_move(m, next_si)) {
-                    uint64_t subnodes = run_perft(depth - 1);
-                    if (is_interactive()) {
-                        std::cout << std::format("  {}{}{}: {}{}{}\n", style.yellow, m.to_string(), style.reset, style.magenta, subnodes, style.reset);
-                    } else {
-                        std::cout << std::format("  {}: {}\n", m.to_string(), subnodes);
-                    }
-                    total += subnodes;
-                }
-                pos.unmake_move(m);
-            }
-            if (is_interactive()) {
-                std::cout << std::format("{}Total{}: {}{}{}\n", style.green, style.reset, style.magenta, total, style.reset);
-            } else {
-                std::cout << std::format("Total: {}\n", total);
-            }
+            run_divide(depth, false);
         }
         else if (token == "eval") {
             Eval::print_detailed_eval(pos, use_color);
@@ -915,6 +873,51 @@ bool UCI::execute_line(const std::string& line) {
                                      style.bold, style.yellow, style.reset, style.bold);
         }
         return true;
+}
+
+void UCI::run_divide(int depth, bool is_go_cmd) {
+    if (depth < 1) depth = 1;
+
+    if (!is_go_cmd) {
+        if (is_interactive()) {
+            std::cout << std::format("Divide depth {}{}{}...\n", style.magenta, depth, style.reset);
+        } else {
+            std::cout << std::format("Divide depth {}...\n", depth);
+        }
+    }
+
+    MoveList list;
+    list.generate(pos);
+    uint64_t total = 0;
+
+    for (size_t i = 0; i < list.size(); ++i) {
+        Move m = list[i].move;
+        StateInfo next_si;
+        if (pos.make_move(m, next_si)) {
+            uint64_t subnodes = run_perft(depth - 1);
+            if (is_go_cmd) {
+                std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
+            } else {
+                if (is_interactive()) {
+                    std::cout << std::format("  {}{}{}: {}{}{}\n", style.yellow, m.to_string(), style.reset, style.magenta, subnodes, style.reset);
+                } else {
+                    std::cout << std::format("  {}: {}\n", m.to_string(), subnodes);
+                }
+            }
+            total += subnodes;
+        }
+        pos.unmake_move(m);
+    }
+
+    if (is_go_cmd) {
+        std::cout << std::format("\nNodes searched: {}\n", total);
+    } else {
+        if (is_interactive()) {
+            std::cout << std::format("{}Total{}: {}{}{}\n", style.green, style.reset, style.magenta, total, style.reset);
+        } else {
+            std::cout << std::format("Total: {}\n", total);
+        }
+    }
 }
 
 void UCI::print_arguments_help() {
