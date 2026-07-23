@@ -68,25 +68,38 @@ void init_terminal() {
 }
 
 void print_banner(bool use_utf8) {
+    std::cout << style.blue << "========================================================\n" << style.reset;
     if (use_utf8) {
-        std::cout << style.cyan << "    ██████╗ ██╗   ██╗██╗     ██╗  ██╗   ██╗\n";
-        std::cout << "    ██╔══██╗██║   ██║██║     ██║  ╚██╗ ██╔╝\n";
-        std::cout << "    ██████╔╝██║   ██║██║     ██║   ╚████╔╝ \n";
-        std::cout << "    ██╔══██╗██║   ██║██║     ██║    ╚██╔╝  \n";
-        std::cout << "    ██████╔╝╚██████╔╝███████╗███████╗██║   \n";
-        std::cout << "    ╚══════╝  ╚═════╝ ╚══════╝╚══════╝╚═╝   \n" << style.reset;
+        std::cout << style.cyan << " ██████╗  ██╗   ██╗ ██╗      ██╗   ██╗   ██╗\n";
+        std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║   ╚██╗ ██╔╝\n";
+        std::cout << " ██████╔╝ ██║   ██║ ██║      ██║    ╚████╔╝ \n";
+        std::cout << " ██╔══██╗ ██║   ██║ ██║      ██║     ╚██╔╝  \n";
+        std::cout << " ██████╔╝ ╚██████╔╝ ███████╗ ███████╗ ██║   \n";
+        std::cout << " ╚═════╝   ╚═════╝  ╚══════╝ ╚══════╝ ╚═╝   \n" << style.reset;
     } else {
-        std::cout << style.cyan << "    +---------------------------------+\n";
-        std::cout << "    |  ____  _   _ _     _ __     __  |\n";
-        std::cout << "    | | __ )| | | | |   | |\\ \\   / /  |\n";
-        std::cout << "    | |  _ \\| | | | |   | | \\ \\_/ /   |\n";
-        std::cout << "    | | |_) | |_| | |___| |__|   |    |\n";
-        std::cout << "    | |____/ \\___/|_____|_____|_/     |\n";
-        std::cout << "    +---------------------------------+\n" << style.reset;
+        std::cout << style.cyan << "  ____  _   _ _     _    __   __ \n";
+        std::cout << " |  _ \\| | | | |   | |   \\ \\ / / \n";
+        std::cout << " | |_) | | | | |   | |    \\ V /  \n";
+        std::cout << " |  _ <| |_| | |___| |___  | |   \n";
+        std::cout << " |____/ \\___/|_____|_____| |_|   \n\n" << style.reset;
     }
-    std::cout << std::format("    {}Bully Chess Engine{} v{}\n", style.bold, style.reset, ENGINE_VERSION);
-    std::cout << std::format("    Compiled on {} at {}\n", __DATE__, __TIME__);
-    std::cout << std::format("    Type '{}{}help{}{}' for interactive options.\n\n", style.bold, style.yellow, style.reset, style.bold);
+    std::cout << style.blue << "========================================================\n" << style.reset;
+    std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
+    std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
+    std::cout << std::format("  {}Compiler{}     : {}GCC {}{}\n", style.green, style.reset, style.magenta, __VERSION__, style.reset);
+    
+    #if defined(USE_PEXT)
+    std::cout << std::format("  {}Build{}        : {}BMI2 (PEXT){}\n", style.green, style.reset, style.magenta, style.reset);
+    #elif defined(__AVX2__)
+    std::cout << std::format("  {}Build{}        : {}AVX2{}\n", style.green, style.reset, style.magenta, style.reset);
+    #elif defined(__SSE4_2__) || defined(__POPCNT__)
+    std::cout << std::format("  {}Build{}        : {}Modern (SSE4.2/POPCNT){}\n", style.green, style.reset, style.magenta, style.reset);
+    #else
+    std::cout << std::format("  {}Build{}        : {}Generic (x86-64){}\n", style.green, style.reset, style.magenta, style.reset);
+    #endif
+    std::cout << style.blue << "========================================================\n" << style.reset;
+    std::cout << std::format("  Type '{}help{}' for custom CLI commands, or '{}uci{}' for GUI.\n", style.yellow, style.reset, style.yellow, style.reset);
+    std::cout << style.blue << "========================================================\n\n" << style.reset;
 }
 
 void print_interactive_help() {
