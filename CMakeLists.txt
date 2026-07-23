@@ -27,6 +27,7 @@ set(ENGINE_SOURCES
     src/evaluation.cpp
     src/uci.cpp
     src/syzygy.cpp
+    src/cli.cpp
     Pyrrhic/tbprobe.c
 )
 
@@ -41,6 +42,7 @@ set(ENGINE_HEADERS
     src/evaluation.h
     src/uci.h
     src/syzygy.h
+    src/cli.h
 )
 
 # Define static library for the engine to share with the executable and tests
