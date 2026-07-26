@@ -103,3 +103,18 @@ TEST_F(MoveGenTest, PerftPosition4) {
     EXPECT_EQ(perft(2, pos), 264ULL);
     EXPECT_EQ(perft(3, pos), 9467ULL);
 }
+
+// 5. Test captures-only move generation (generate_captures)
+TEST_F(MoveGenTest, GenerateCaptures) {
+    Position pos;
+    StateInfo si;
+    // 1. e4 d5 setup
+    pos.set_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", si);
+
+    MoveList list;
+    list.generate_captures(pos);
+
+    // There should only be exactly 1 capture (e4xd5) and no quiet moves (e.g. e4e5, d2d3)
+    EXPECT_EQ(list.size(), 1);
+    EXPECT_EQ(list[0].move, Move(SQ_E4, SQ_D5));
+}
