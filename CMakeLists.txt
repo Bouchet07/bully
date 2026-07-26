@@ -158,6 +158,7 @@ if(BUILD_TESTS)
         tests/test_movegen.cpp
         tests/test_tt.cpp
         tests/test_evaluation.cpp
+        tests/test_search.cpp
     )
     
     add_executable(tests ${TEST_SOURCES})
