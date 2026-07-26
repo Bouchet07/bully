@@ -64,5 +64,8 @@ int main(int argc, char** argv) {
     // Start UCI communication loop
     uci.loop();
 
+    // Ensure search thread is joined/cleaned up before exiting
+    Bully::Search::stop_and_join();
+
     return 0;
 }

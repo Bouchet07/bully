@@ -504,17 +504,6 @@ void Position::print(bool Use_UTF8, bool Use_Color) const {
     std::cout << std::format("  {}FEN          : {}{}{}\n\n", label, value, get_fen(), reset);
 }
 
-static inline Value get_piece_value(PieceType pt) {
-    switch (pt) {
-        case PAWN:   return PawnValue;
-        case KNIGHT: return KnightValue;
-        case BISHOP: return BishopValue;
-        case ROOK:   return RookValue;
-        case QUEEN:  return QueenValue;
-        case KING:   return 10000;
-        default:     return VALUE_ZERO;
-    }
-}
 
 Value Position::see(Move m) const {
     Square from = m.from_sq();

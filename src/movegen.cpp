@@ -16,63 +16,126 @@ void generate_all(const Position& pos, MoveList& move_list) {
     // ------------------------------------------------------------------------
     // 1. Pawn Moves
     // ------------------------------------------------------------------------
-    constexpr Direction up        = pawn_push(Us);
-    constexpr Rank start_rank     = (Us == WHITE) ? RANK_2 : RANK_7;
-    constexpr Rank promo_rank     = (Us == WHITE) ? RANK_8 : RANK_1;
-
+    // We use a high-performance parallel shift-based move generation algorithm.
+    // Instead of looping over individual pawn squares one by one, we shift the
+    // entire pawn bitboard at once in all directions, masking out occupied or
+    // empty squares to generate target squares in bulk. This completely avoids
+    // individual square checks and conditional branching.
     Bitboard pawns = pos.pieces(Us, PAWN);
-    while (pawns) {
-        Square from = get_LSB(pawns);
-        pawns ^= square_bb(from);
+    constexpr Rank promo_rank  = relative_rank(Us, RANK_8);
 
-        // A. Single & Double pushes (Quiet Moves)
-        if constexpr (!CapturesOnly) {
-            Square to = from + up;
-            if (pos.piece_on(to) == NO_PIECE) {
-                if (rank_of(to) == promo_rank) {
-                    move_list.push(Move::make<PROMOTION>(from, to, QUEEN));
-                    move_list.push(Move::make<PROMOTION>(from, to, ROOK));
-                    move_list.push(Move::make<PROMOTION>(from, to, BISHOP));
-                    move_list.push(Move::make<PROMOTION>(from, to, KNIGHT));
-                } else {
-                    move_list.push(Move(from, to));
-                    
-                    // Double push
-                    if (rank_of(from) == start_rank) {
-                        Square double_to = to + up;
-                        if (pos.piece_on(double_to) == NO_PIECE) {
-                            move_list.push(Move(from, double_to));
-                        }
-                    }
-                }
-            }
+    // Dynamic color-dependent vector directions
+    constexpr Direction Up     = pawn_push(Us);
+    constexpr Direction UpUp   = Up + Up;
+    constexpr Direction UpWest = Up + WEST;
+    constexpr Direction UpEast = Up + EAST;
+
+    Bitboard empty_squares = ~occupied_squares;
+
+    if constexpr (!CapturesOnly) {
+        // Quiet moves: Single pushes (shifted forward by 1 rank onto empty squares)
+        Bitboard single_pushes = shift<Up>(pawns) & empty_squares;
+
+        // Partition single pushes into promotions (reaching the 8th rank) 
+        // and quiet pushes to avoid branchy checks inside the serialization loops.
+        Bitboard promo_pushes = single_pushes & rank_bb(promo_rank);
+        Bitboard quiet_pushes = single_pushes & ~rank_bb(promo_rank);
+
+        // Process quiet pushes: serialize target squares using hardware LSB popping.
+        // We use value-based lsb(b) and inline b &= b - 1 (which compiles directly 
+        // to single-cycle TZCNT and BLSR instructions) to prevent compiler register-spills.
+        while (quiet_pushes) {
+            Square to = lsb(quiet_pushes);
+            quiet_pushes &= quiet_pushes - 1;
+            Square from = to - Up;
+            move_list.push(Move(from, to));
         }
 
-        // B. Pawn Captures (Diagonal Attacks)
-        Bitboard attacks = pawn_attacks(Us, from);
-        Bitboard captures = attacks & enemy_pieces;
-        while (captures) {
-            Square to = get_LSB(captures);
-            captures ^= square_bb(to);
-
-            if (rank_of(to) == promo_rank) {
-                move_list.push(Move::make<PROMOTION>(from, to, QUEEN));
-                move_list.push(Move::make<PROMOTION>(from, to, ROOK));
-                move_list.push(Move::make<PROMOTION>(from, to, BISHOP));
-                move_list.push(Move::make<PROMOTION>(from, to, KNIGHT));
-            } else {
-                move_list.push(Move(from, to));
-            }
+        // Process promo pushes: expand each single push reaching the 8th rank 
+        // into four distinct promotion moves (Queen, Rook, Bishop, Knight).
+        while (promo_pushes) {
+            Square to = lsb(promo_pushes);
+            promo_pushes &= promo_pushes - 1;
+            Square from = to - Up;
+            move_list.push(Move::make<PROMOTION>(from, to, QUEEN));
+            move_list.push(Move::make<PROMOTION>(from, to, ROOK));
+            move_list.push(Move::make<PROMOTION>(from, to, BISHOP));
+            move_list.push(Move::make<PROMOTION>(from, to, KNIGHT));
         }
 
-        // C. En Passant Capture
-        if (pos.en_passant_square() != SQ_NONE) {
-            Bitboard ep_targets = attacks & pos.en_passant_square();
-            while (ep_targets) {
-                Square to = get_LSB(ep_targets);
-                ep_targets ^= square_bb(to);
-                move_list.push(Move::make<EN_PASSANT>(from, to));
-            }
+        // Process double pushes: pawns on the start rank that can push forward by 
+        // 2 ranks onto empty squares (using the single pushes as the step-wise basis).
+        constexpr Rank double_push_rank = (Us == WHITE) ? RANK_3 : RANK_6;
+        Bitboard double_pushes = shift<Up>(single_pushes & rank_bb(double_push_rank)) & empty_squares;
+
+        while (double_pushes) {
+            Square to = lsb(double_pushes);
+            double_pushes &= double_pushes - 1;
+            Square from = to - UpUp;
+            move_list.push(Move(from, to));
+        }
+    }
+
+    // Capture moves: Shift pawns diagonally to intersect with enemy pieces.
+    // Wrap-around checks (preventing pawns on file A capturing onto file H) 
+    // are automatically handled by the shift<> template using file masks.
+    Bitboard cap_left  = shift<UpWest>(pawns) & enemy_pieces;
+    Bitboard cap_right = shift<UpEast>(pawns) & enemy_pieces;
+
+    // Partition left captures into promotions and normal captures
+    Bitboard promo_left = cap_left & rank_bb(promo_rank);
+    Bitboard quiet_left = cap_left & ~rank_bb(promo_rank);
+
+    // Partition right captures into promotions and normal captures
+    Bitboard promo_right = cap_right & rank_bb(promo_rank);
+    Bitboard quiet_right = cap_right & ~rank_bb(promo_rank);
+
+    // Process Left Quiet Captures
+    while (quiet_left) {
+        Square to = lsb(quiet_left);
+        quiet_left &= quiet_left - 1;
+        Square from = to - UpWest;
+        move_list.push(Move(from, to));
+    }
+
+    // Process Left Promo Captures
+    while (promo_left) {
+        Square to = lsb(promo_left);
+        promo_left &= promo_left - 1;
+        Square from = to - UpWest;
+        move_list.push(Move::make<PROMOTION>(from, to, QUEEN));
+        move_list.push(Move::make<PROMOTION>(from, to, ROOK));
+        move_list.push(Move::make<PROMOTION>(from, to, BISHOP));
+        move_list.push(Move::make<PROMOTION>(from, to, KNIGHT));
+    }
+
+    // Process Right Quiet Captures
+    while (quiet_right) {
+        Square to = lsb(quiet_right);
+        quiet_right &= quiet_right - 1;
+        Square from = to - UpEast;
+        move_list.push(Move(from, to));
+    }
+
+    // Process Right Promo Captures
+    while (promo_right) {
+        Square to = lsb(promo_right);
+        promo_right &= promo_right - 1;
+        Square from = to - UpEast;
+        move_list.push(Move::make<PROMOTION>(from, to, QUEEN));
+        move_list.push(Move::make<PROMOTION>(from, to, ROOK));
+        move_list.push(Move::make<PROMOTION>(from, to, BISHOP));
+        move_list.push(Move::make<PROMOTION>(from, to, KNIGHT));
+    }
+
+    // En Passant Capture
+    Square ep_sq = pos.en_passant_square();
+    if (ep_sq != SQ_NONE) {
+        Bitboard ep_attackers = pawn_attacks(Them, ep_sq) & pawns;
+        while (ep_attackers) {
+            Square from = lsb(ep_attackers);
+            ep_attackers &= ep_attackers - 1;
+            move_list.push(Move::make<EN_PASSANT>(from, ep_sq));
         }
     }
 
@@ -81,13 +144,12 @@ void generate_all(const Position& pos, MoveList& move_list) {
     // ------------------------------------------------------------------------
     Bitboard knights = pos.pieces(Us, KNIGHT);
     while (knights) {
-        Square from = get_LSB(knights);
-        knights ^= square_bb(from);
-
+        Square from = lsb(knights);
+        knights &= knights - 1;
         Bitboard targets = knight_attacks(from) & target_squares;
         while (targets) {
-            Square to = get_LSB(targets);
-            targets ^= square_bb(to);
+            Square to = lsb(targets);
+            targets &= targets - 1;
             move_list.push(Move(from, to));
         }
     }
@@ -97,13 +159,12 @@ void generate_all(const Position& pos, MoveList& move_list) {
     // ------------------------------------------------------------------------
     Bitboard diagonal_sliders = pos.pieces(Us, BISHOP) | pos.pieces(Us, QUEEN);
     while (diagonal_sliders) {
-        Square from = get_LSB(diagonal_sliders);
-        diagonal_sliders ^= square_bb(from);
-
+        Square from = lsb(diagonal_sliders);
+        diagonal_sliders &= diagonal_sliders - 1;
         Bitboard targets = bishop_attacks(from, occupied_squares) & target_squares;
         while (targets) {
-            Square to = get_LSB(targets);
-            targets ^= square_bb(to);
+            Square to = lsb(targets);
+            targets &= targets - 1;
             move_list.push(Move(from, to));
         }
     }
@@ -113,13 +174,12 @@ void generate_all(const Position& pos, MoveList& move_list) {
     // ------------------------------------------------------------------------
     Bitboard straight_sliders = pos.pieces(Us, ROOK) | pos.pieces(Us, QUEEN);
     while (straight_sliders) {
-        Square from = get_LSB(straight_sliders);
-        straight_sliders ^= square_bb(from);
-
+        Square from = lsb(straight_sliders);
+        straight_sliders &= straight_sliders - 1;
         Bitboard targets = rook_attacks(from, occupied_squares) & target_squares;
         while (targets) {
-            Square to = get_LSB(targets);
-            targets ^= square_bb(to);
+            Square to = lsb(targets);
+            targets &= targets - 1;
             move_list.push(Move(from, to));
         }
     }
@@ -130,8 +190,8 @@ void generate_all(const Position& pos, MoveList& move_list) {
     Square king_from = pos.king_square(Us);
     Bitboard king_targets = king_attacks(king_from) & target_squares;
     while (king_targets) {
-        Square to = get_LSB(king_targets);
-        king_targets ^= square_bb(to);
+        Square to = lsb(king_targets);
+        king_targets &= king_targets - 1;
         move_list.push(Move(king_from, to));
     }
 

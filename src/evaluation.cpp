@@ -1,5 +1,8 @@
 #include "evaluation.h"
 #include "bitboard.h"
+#include <utility>
+#include <iostream>
+#include <format>
 
 namespace Bully {
 namespace Eval {
@@ -100,23 +103,47 @@ constexpr std::array<int, 64> KingEndgamePST = {
     -50, -30, -30, -30, -30, -30, -30, -50  // Rank 8
 };
 
+// Precomputed file spans and adjacent files
+constexpr std::array<Bitboard, 8> AdjacentFiles = []() {
+    std::array<Bitboard, 8> arr{};
+    for (int i = 0; i < 8; ++i) {
+        File f = static_cast<File>(i);
+        Bitboard mask = 0;
+        if (f > FILE_A) mask |= file_bb(static_cast<File>(std::to_underlying(f) - 1));
+        if (f < FILE_H) mask |= file_bb(static_cast<File>(std::to_underlying(f) + 1));
+        arr[to_index(f)] = mask;
+    }
+    return arr;
+}();
+
+constexpr std::array<Bitboard, 64> FrontSpansWhite = []() {
+    std::array<Bitboard, 64> arr{};
+    for (int i = 0; i < 64; ++i) {
+        Square sq = static_cast<Square>(i);
+        int shift_amt = 8 * (std::to_underlying(rank_of(sq)) + 1);
+        arr[to_index(sq)] = (shift_amt >= 64) ? 0ULL : (~0ULL << shift_amt);
+    }
+    return arr;
+}();
+
+constexpr std::array<Bitboard, 64> FrontSpansBlack = []() {
+    std::array<Bitboard, 64> arr{};
+    for (int i = 0; i < 64; ++i) {
+        Square sq = static_cast<Square>(i);
+        arr[to_index(sq)] = (1ULL << (8 * std::to_underlying(rank_of(sq)))) - 1;
+    }
+    return arr;
+}();
+
 // Compute the game phase (24 = full middlegame, 0 = pure endgame)
 [[nodiscard]] static int calculate_phase(const Position& pos) {
     int phase = 24;
-    
-    // Starting material counts:
-    // 4 Knights * 1 phase point
-    // 4 Bishops * 1 phase point
-    // 4 Rooks * 2 phase points
-    // 2 Queens * 4 phase points
-    // Total starting phase points = 24
     
     int knights = popcnt(pos.pieces(KNIGHT));
     int bishops = popcnt(pos.pieces(BISHOP));
     int rooks   = popcnt(pos.pieces(ROOK));
     int queens  = popcnt(pos.pieces(QUEEN));
 
-    // Remaining phase points:
     phase -= (4 - knights) * 1;
     phase -= (4 - bishops) * 1;
     phase -= (4 - rooks) * 2;
@@ -128,199 +155,189 @@ constexpr std::array<int, 64> KingEndgamePST = {
     return phase;
 }
 
+template<Color Us>
+[[nodiscard]] static std::pair<Value, Value> evaluate_pawns(const Position& pos) {
+    constexpr Color Them = ~Us;
+    const Bitboard our_pawns = pos.pieces(Us, PAWN);
+    const Bitboard opponent_pawns = pos.pieces(Them, PAWN);
+    
+    Value mg = 0;
+    Value eg = 0;
+    
+    Bitboard pawns = our_pawns;
+    while (pawns) {
+        Square sq = lsb(pawns);
+        pawns &= pawns - 1;
+        
+        Square rel_sq = relative_square(Us, sq);
+        size_t idx = to_index(rel_sq);
+        
+        int p_mg = PawnPST[idx];
+        int p_eg = PawnPST[idx];
+        
+        File f = file_of(sq);
+        Bitboard adjacent = AdjacentFiles[to_index(f)];
+        
+        // Isolated Pawn Penalty
+        if ((our_pawns & adjacent) == 0) {
+            p_mg -= 15;
+            p_eg -= 15;
+        }
+        
+        // Doubled Pawn Penalty (once per file, when sq is the LSB on that file)
+        Bitboard same_file = our_pawns & file_bb(sq);
+        if (more_than_one(same_file) && sq == get_LSB(same_file)) {
+            p_mg -= 15;
+            p_eg -= 15;
+        }
+        
+        // Passed Pawn Bonus
+        Bitboard front_span = (Us == WHITE) ? FrontSpansWhite[to_index(sq)] : FrontSpansBlack[to_index(sq)];
+        Bitboard files_to_check = file_bb(sq) | adjacent;
+        if ((opponent_pawns & files_to_check & front_span) == 0) {
+            int rel_rank = std::to_underlying(relative_rank(Us, rank_of(sq)));
+            p_mg += 10 * rel_rank;
+            p_eg += 20 * rel_rank;
+        }
+        
+        mg = static_cast<Value>(mg + PawnValue + p_mg);
+        eg = static_cast<Value>(eg + PawnValue + p_eg);
+    }
+    
+    return { mg, eg };
+}
+
+template<Color Us>
+[[nodiscard]] static std::pair<Value, Value> evaluate_pieces(const Position& pos) {
+    Value mg = 0;
+    Value eg = 0;
+    
+    Bitboard knights = pos.pieces(Us, KNIGHT);
+    while (knights) {
+        Square sq = lsb(knights);
+        knights &= knights - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + KnightValue + KnightPST[idx]);
+        eg = static_cast<Value>(eg + KnightValue + KnightPST[idx]);
+    }
+    
+    Bitboard bishops = pos.pieces(Us, BISHOP);
+    while (bishops) {
+        Square sq = lsb(bishops);
+        bishops &= bishops - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + BishopValue + BishopPST[idx]);
+        eg = static_cast<Value>(eg + BishopValue + BishopPST[idx]);
+    }
+    
+    Bitboard rooks = pos.pieces(Us, ROOK);
+    while (rooks) {
+        Square sq = lsb(rooks);
+        rooks &= rooks - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + RookValue + RookPST[idx]);
+        eg = static_cast<Value>(eg + RookValue + RookPST[idx]);
+    }
+    
+    Bitboard queens = pos.pieces(Us, QUEEN);
+    while (queens) {
+        Square sq = lsb(queens);
+        queens &= queens - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + QueenValue + QueenPST[idx]);
+        eg = static_cast<Value>(eg + QueenValue + QueenPST[idx]);
+    }
+    
+    Bitboard king = pos.pieces(Us, KING);
+    if (king) {
+        Square sq = get_LSB(king);
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + KingMiddlegamePST[idx]);
+        eg = static_cast<Value>(eg + KingEndgamePST[idx]);
+    }
+    
+    // Bishop pair bonus
+    int bishop_count = popcnt(pos.pieces(Us, BISHOP));
+    if (bishop_count >= 2) {
+        mg = static_cast<Value>(mg + 30);
+        eg = static_cast<Value>(eg + 40);
+    }
+    
+    return { mg, eg };
+}
+
 Value evaluate(const Position& pos) {
-    Value mg_white = 0;
-    Value mg_black = 0;
-    Value eg_white = 0;
-    Value eg_black = 0;
-
-    // --- 1. WHITE PIECES EVALUATION ---
-    Bitboard white_pawns_all = pos.pieces(WHITE, PAWN);
-    Bitboard pawns = white_pawns_all;
-    while (pawns) {
-        Square sq = pop_LSB(pawns);
-        size_t idx = to_index(sq);
-        
-        int mg = PawnPST[idx];
-        int eg = PawnPST[idx];
-        
-        // Adjacent files mask
-        Bitboard adjacent_files = 0;
-        File f = file_of(sq);
-        if (f > FILE_A) adjacent_files |= file_bb(static_cast<File>(std::to_underlying(f) - 1));
-        if (f < FILE_H) adjacent_files |= file_bb(static_cast<File>(std::to_underlying(f) + 1));
-        
-        // Isolated Pawn Penalty
-        if ((white_pawns_all & adjacent_files) == 0) {
-            mg -= 15;
-            eg -= 15;
-        }
-        
-        // Doubled Pawn Penalty (once per file, when sq is the LSB on that file)
-        Bitboard same_file = white_pawns_all & file_bb(sq);
-        if (more_than_one(same_file) && sq == get_LSB(same_file)) {
-            mg -= 15;
-            eg -= 15;
-        }
-        
-        // Passed Pawn Bonus
-        Bitboard front_span = ~0ULL << (8 * (std::to_underlying(rank_of(sq)) + 1));
-        Bitboard files_to_check = file_bb(sq) | adjacent_files;
-        if ((pos.pieces(BLACK, PAWN) & files_to_check & front_span) == 0) {
-            int relative_rank = std::to_underlying(rank_of(sq)); // 0-7 (1st to 8th rank)
-            mg += 10 * relative_rank;
-            eg += 20 * relative_rank;
-        }
-        
-        mg_white = static_cast<Value>(mg_white + PawnValue + mg);
-        eg_white = static_cast<Value>(eg_white + PawnValue + eg);
-    }
-
-    Bitboard knights = pos.pieces(WHITE, KNIGHT);
-    while (knights) {
-        Square sq = pop_LSB(knights);
-        size_t idx = to_index(sq);
-        mg_white = static_cast<Value>(mg_white + KnightValue + KnightPST[idx]);
-        eg_white = static_cast<Value>(eg_white + KnightValue + KnightPST[idx]);
-    }
-
-    Bitboard bishops = pos.pieces(WHITE, BISHOP);
-    while (bishops) {
-        Square sq = pop_LSB(bishops);
-        size_t idx = to_index(sq);
-        mg_white = static_cast<Value>(mg_white + BishopValue + BishopPST[idx]);
-        eg_white = static_cast<Value>(eg_white + BishopValue + BishopPST[idx]);
-    }
-
-    Bitboard rooks = pos.pieces(WHITE, ROOK);
-    while (rooks) {
-        Square sq = pop_LSB(rooks);
-        size_t idx = to_index(sq);
-        mg_white = static_cast<Value>(mg_white + RookValue + RookPST[idx]);
-        eg_white = static_cast<Value>(eg_white + RookValue + RookPST[idx]);
-    }
-
-    Bitboard queens = pos.pieces(WHITE, QUEEN);
-    while (queens) {
-        Square sq = pop_LSB(queens);
-        size_t idx = to_index(sq);
-        mg_white = static_cast<Value>(mg_white + QueenValue + QueenPST[idx]);
-        eg_white = static_cast<Value>(eg_white + QueenValue + QueenPST[idx]);
-    }
-
-    Bitboard king = pos.pieces(WHITE, KING);
-    if (king) {
-        Square sq = get_LSB(king);
-        size_t idx = to_index(sq);
-        mg_white = static_cast<Value>(mg_white + KingMiddlegamePST[idx]);
-        eg_white = static_cast<Value>(eg_white + KingEndgamePST[idx]);
-    }
-
-    // --- 2. BLACK PIECES EVALUATION ---
-    Bitboard black_pawns_all = pos.pieces(BLACK, PAWN);
-    pawns = black_pawns_all;
-    while (pawns) {
-        Square sq = pop_LSB(pawns);
-        size_t idx = to_index(flip_rank(sq));
-        
-        int mg = PawnPST[idx];
-        int eg = PawnPST[idx];
-        
-        // Adjacent files mask
-        Bitboard adjacent_files = 0;
-        File f = file_of(sq);
-        if (f > FILE_A) adjacent_files |= file_bb(static_cast<File>(std::to_underlying(f) - 1));
-        if (f < FILE_H) adjacent_files |= file_bb(static_cast<File>(std::to_underlying(f) + 1));
-        
-        // Isolated Pawn Penalty
-        if ((black_pawns_all & adjacent_files) == 0) {
-            mg -= 15;
-            eg -= 15;
-        }
-        
-        // Doubled Pawn Penalty (once per file, when sq is the LSB on that file)
-        Bitboard same_file = black_pawns_all & file_bb(sq);
-        if (more_than_one(same_file) && sq == get_LSB(same_file)) {
-            mg -= 15;
-            eg -= 15;
-        }
-        
-        // Passed Pawn Bonus
-        Bitboard front_span = (1ULL << (8 * std::to_underlying(rank_of(sq)))) - 1;
-        Bitboard files_to_check = file_bb(sq) | adjacent_files;
-        if ((pos.pieces(WHITE, PAWN) & files_to_check & front_span) == 0) {
-            int relative_rank = 7 - std::to_underlying(rank_of(sq)); // 0-7 (8th to 1st rank relative to black)
-            mg += 10 * relative_rank;
-            eg += 20 * relative_rank;
-        }
-        
-        mg_black = static_cast<Value>(mg_black + PawnValue + mg);
-        eg_black = static_cast<Value>(eg_black + PawnValue + eg);
-    }
-
-    knights = pos.pieces(BLACK, KNIGHT);
-    while (knights) {
-        Square sq = pop_LSB(knights);
-        size_t idx = to_index(flip_rank(sq));
-        mg_black = static_cast<Value>(mg_black + KnightValue + KnightPST[idx]);
-        eg_black = static_cast<Value>(eg_black + KnightValue + KnightPST[idx]);
-    }
-
-    bishops = pos.pieces(BLACK, BISHOP);
-    while (bishops) {
-        Square sq = pop_LSB(bishops);
-        size_t idx = to_index(flip_rank(sq));
-        mg_black = static_cast<Value>(mg_black + BishopValue + BishopPST[idx]);
-        eg_black = static_cast<Value>(eg_black + BishopValue + BishopPST[idx]);
-    }
-
-    rooks = pos.pieces(BLACK, ROOK);
-    while (rooks) {
-        Square sq = pop_LSB(rooks);
-        size_t idx = to_index(flip_rank(sq));
-        mg_black = static_cast<Value>(mg_black + RookValue + RookPST[idx]);
-        eg_black = static_cast<Value>(eg_black + RookValue + RookPST[idx]);
-    }
-
-    queens = pos.pieces(BLACK, QUEEN);
-    while (queens) {
-        Square sq = pop_LSB(queens);
-        size_t idx = to_index(flip_rank(sq));
-        mg_black = static_cast<Value>(mg_black + QueenValue + QueenPST[idx]);
-        eg_black = static_cast<Value>(eg_black + QueenValue + QueenPST[idx]);
-    }
-
-    king = pos.pieces(BLACK, KING);
-    if (king) {
-        Square sq = get_LSB(king);
-        size_t idx = to_index(flip_rank(sq));
-        mg_black = static_cast<Value>(mg_black + KingMiddlegamePST[idx]);
-        eg_black = static_cast<Value>(eg_black + KingEndgamePST[idx]);
-    }
-
-    // --- 2.5. BISHOP PAIR BONUS ---
-    int white_bishops = popcnt(pos.pieces(WHITE, BISHOP));
-    if (white_bishops >= 2) {
-        mg_white = static_cast<Value>(mg_white + 30);
-        eg_white = static_cast<Value>(eg_white + 40);
-    }
-    int black_bishops = popcnt(pos.pieces(BLACK, BISHOP));
-    if (black_bishops >= 2) {
-        mg_black = static_cast<Value>(mg_black + 30);
-        eg_black = static_cast<Value>(eg_black + 40);
-    }
-
-    // --- 3. TAPERED INTERPOLATION ---
+    auto [mg_white_pawns, eg_white_pawns] = evaluate_pawns<WHITE>(pos);
+    auto [mg_white_pieces, eg_white_pieces] = evaluate_pieces<WHITE>(pos);
+    
+    auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
+    auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
+    
+    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
+    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    
+    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
+    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    
     int phase = calculate_phase(pos);
     
     Value mg_score = static_cast<Value>(mg_white - mg_black);
     Value eg_score = static_cast<Value>(eg_white - eg_black);
-
-    // Interpolate score between Middlegame and Endgame phase points
+    
     Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
-
-    // Return evaluation relative to the side to move
+    
     return (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
+}
+
+void print_detailed_eval(const Position& pos, bool use_color) {
+    auto [mg_white_pawns, eg_white_pawns] = evaluate_pawns<WHITE>(pos);
+    auto [mg_white_pieces, eg_white_pieces] = evaluate_pieces<WHITE>(pos);
+    
+    auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
+    auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
+    
+    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
+    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    
+    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
+    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    
+    int phase = calculate_phase(pos);
+    
+    Value mg_score = static_cast<Value>(mg_white - mg_black);
+    Value eg_score = static_cast<Value>(eg_white - eg_black);
+    
+    Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
+    Value relative_score = (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
+
+    std::string reset   = use_color ? "\033[0m" : "";
+    std::string yellow  = use_color ? "\033[1;33m" : "";
+    std::string blue    = use_color ? "\033[1;34m" : "";
+    std::string green   = use_color ? "\033[1;32m" : "";
+    std::string magenta = use_color ? "\033[1;35m" : "";
+
+    std::cout << blue << "========================================================\n" << reset;
+    std::cout << yellow << "                 Bully Static Evaluation                 \n" << reset;
+    std::cout << blue << "========================================================\n" << reset;
+    std::cout << std::format("  {}Phase{} : {}{} (24 = Middlegame, 0 = Endgame)\n", 
+                 green, reset, magenta, phase, reset);
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << "  Category           |  White (MG/EG)  |  Black (MG/EG)   \n";
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << std::format("  Pawns & PST        |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white_pawns, eg_white_pawns, mg_black_pawns, eg_black_pawns);
+    std::cout << std::format("  Pieces & PST       |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white_pieces, eg_white_pieces, mg_black_pieces, eg_black_pieces);
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << std::format("  Total Term         |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white, eg_white, mg_black, eg_black);
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << std::format("  {}Middlegame Score{}   : {}{:+6}{}\n", green, reset, magenta, mg_score, reset);
+    std::cout << std::format("  {}Endgame Score{}      : {}{:+6}{}\n", green, reset, magenta, eg_score, reset);
+    std::cout << std::format("  {}Interpolated Score{} : {}{:+6}{}\n", green, reset, magenta, score, reset);
+    std::cout << std::format("  {}Relative Score{}     : {}{:+6}{} (relative to {})\n", 
+                 green, reset, magenta, relative_score, reset, pos.side_to_move() == WHITE ? "White" : "Black");
+    std::cout << blue << "========================================================\n" << reset;
 }
 
 } // namespace Eval

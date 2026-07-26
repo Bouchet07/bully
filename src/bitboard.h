@@ -24,6 +24,11 @@ namespace Bully {
     return b ? static_cast<Square>(std::countr_zero(b)) : SQ_NONE;
 }
 
+// Returns the index of the least significant bit set (Hardware TZCNT/BSF), assuming the bitboard is not empty.
+[[nodiscard]] constexpr Square lsb(Bitboard b) {
+    return static_cast<Square>(std::countr_zero(b));
+}
+
 // ============================================================================
 // File & Rank Bitboard Masks
 // ============================================================================

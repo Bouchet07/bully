@@ -7,7 +7,7 @@
 #include "bitboard.h"
 
 // Check if BMI2 PEXT is supported
-#if defined(__BMI2__) || (defined(_M_X64) && defined(__AVX2__))
+#if !defined(USE_PEXT) && defined(__BMI2__)
     #define USE_PEXT
 #endif
 
