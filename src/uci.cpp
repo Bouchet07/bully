@@ -5,6 +5,7 @@
 #include <chrono>
 #include <list>
 #include <thread>
+#include <vector>
 
 #include "types.h"
 #include "uci.h"
