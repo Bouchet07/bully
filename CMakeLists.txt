@@ -159,6 +159,7 @@ if(BUILD_TESTS)
         tests/test_tt.cpp
         tests/test_evaluation.cpp
         tests/test_search.cpp
+        tests/test_syzygy.cpp
     )
     
     add_executable(tests ${TEST_SOURCES})

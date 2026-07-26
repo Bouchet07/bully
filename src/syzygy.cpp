@@ -5,6 +5,7 @@
 #include <bit>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 namespace Bully {
 namespace Syzygy {
@@ -89,6 +90,11 @@ bool probe_root(const Position& pos, Move& best_tb_move, Value& tb_score) {
                                     static_cast<unsigned>(pos.rule50()), ep, turn, false, &results);
 
     if (!success || results.size == 0) return false;
+
+    // Sort moves by rank descending to get the best move first
+    std::sort(results.moves, results.moves + results.size, [](const TbRootMove& a, const TbRootMove& b) {
+        return a.tbRank > b.tbRank;
+    });
 
     PyrrhicMove pm = results.moves[0].move;
     Square from = static_cast<Square>(PYRRHIC_MOVE_FROM(pm));
