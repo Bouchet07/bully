@@ -165,3 +165,19 @@ TEST_F(TTTest, AgingReplacement) {
     // get_size_mb check
     EXPECT_EQ(TT.get_size_mb(), 1);
 }
+
+// 6. Test memory alignment of Cluster and the allocated table pointer
+TEST_F(TTTest, MemoryAlignment) {
+    // A Cluster must fit in exactly 32 bytes (half a standard CPU cache line)
+    EXPECT_EQ(sizeof(Cluster), 32);
+    EXPECT_EQ(alignof(Cluster), 32);
+
+    // Ensure the table is allocated
+    TT.resize(1);
+    const void* ptr = TT.get_raw_table();
+    ASSERT_NE(ptr, nullptr);
+
+    // The start of the table must be 64-byte aligned (cache line aligned)
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    EXPECT_EQ(addr % 64, 0);
+}

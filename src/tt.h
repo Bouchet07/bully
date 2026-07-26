@@ -81,6 +81,9 @@ public:
         return (cluster_count * sizeof(Cluster)) / (1024 * 1024);
     }
 
+    // Get the raw pointer of the allocated table for alignment testing
+    [[nodiscard]] const void* get_raw_table() const { return table; }
+
 private:
     Cluster* table = nullptr;
     size_t   cluster_count = 0;
