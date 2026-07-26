@@ -116,4 +116,89 @@ TEST(AttacksTest, BishopAttacks) {
                         square_bb(SQ_D3) | square_bb(SQ_C2);
 
     EXPECT_EQ(att, expected);
+}
+
+// Bitboard arithmetic and shifts
+TEST(BitboardTest, OperationsAndShifts) {
+    init_bitboards();
+    
+    // lsb helper
+    Bitboard b = square_bb(SQ_C3) | square_bb(SQ_F5);
+    EXPECT_EQ(lsb(b), SQ_C3);
+
+    // more_than_one helper
+    EXPECT_TRUE(more_than_one(b));
+    EXPECT_FALSE(more_than_one(square_bb(SQ_C3)));
+    EXPECT_FALSE(more_than_one(0));
+
+    // operator overloads
+    Bitboard test_bb = 0;
+    test_bb |= SQ_E4;
+    EXPECT_EQ(test_bb, square_bb(SQ_E4));
+    EXPECT_TRUE(test_bb & SQ_E4);
+    EXPECT_FALSE(test_bb & SQ_A1);
+    
+    test_bb ^= SQ_E4;
+    EXPECT_EQ(test_bb, 0ULL);
+
+    // rank and file bb masks
+    EXPECT_EQ(rank_bb(RANK_2), Rank2BB);
+    EXPECT_EQ(rank_bb(SQ_A2), Rank2BB);
+    EXPECT_EQ(file_bb(FILE_B), FileBBB);
+    EXPECT_EQ(file_bb(SQ_B6), FileBBB);
+
+    // Bitboard shifts
+    Bitboard e4 = square_bb(SQ_E4);
+    EXPECT_EQ(shift<NORTH>(e4), square_bb(SQ_E5));
+    EXPECT_EQ(shift<SOUTH>(e4), square_bb(SQ_E3));
+    EXPECT_EQ(shift<EAST>(e4), square_bb(SQ_F4));
+    EXPECT_EQ(shift<WEST>(e4), square_bb(SQ_D4));
+    EXPECT_EQ(shift<NORTH_EAST>(e4), square_bb(SQ_F5));
+    EXPECT_EQ(shift<NORTH_WEST>(e4), square_bb(SQ_D5));
+    EXPECT_EQ(shift<SOUTH_EAST>(e4), square_bb(SQ_F3));
+    EXPECT_EQ(shift<SOUTH_WEST>(e4), square_bb(SQ_D3));
+
+    // Edge check: shifting EAST on H-file should wrap/clear
+    Bitboard h4 = square_bb(SQ_H4);
+    EXPECT_EQ(shift<EAST>(h4), 0ULL);
+    EXPECT_EQ(shift<NORTH_EAST>(h4), 0ULL);
+
+    // Edge check: shifting WEST on A-file should wrap/clear
+    Bitboard a4 = square_bb(SQ_A4);
+    EXPECT_EQ(shift<WEST>(a4), 0ULL);
+    EXPECT_EQ(shift<SOUTH_WEST>(a4), 0ULL);
+}
+
+// Distance and Lookup Tables validation
+TEST(BitboardTest, DistanceAndLookups) {
+    init_bitboards();
+
+    // distance calculations
+    EXPECT_EQ(distance(FILE_A, FILE_D), 3);
+    EXPECT_EQ(distance(RANK_2, RANK_8), 6);
+    EXPECT_EQ(distance(SQ_A1, SQ_C3), 2); // max(2, 2)
+    EXPECT_EQ(distance(SQ_E4, SQ_F6), 2); // max(1, 2)
+
+    // edge_distance
+    EXPECT_EQ(edge_distance(FILE_A), 0);
+    EXPECT_EQ(edge_distance(FILE_D), 3);
+    EXPECT_EQ(edge_distance(FILE_H), 0);
+
+    // line_bb
+    // A1 and A8 aligned vertically, line should be file A
+    EXPECT_EQ(line_bb(SQ_A1, SQ_A8), FileABB);
+    // A1 and H8 aligned diagonally
+    Bitboard diag_expected = 0;
+    for (Square s = SQ_A1; s <= SQ_H8; ++s) {
+        if (std::to_underlying(file_of(s)) == std::to_underlying(rank_of(s))) diag_expected |= s;
+    }
+    EXPECT_EQ(line_bb(SQ_A1, SQ_H8), diag_expected);
+
+    // between_bb (excluding s1, including s2)
+    // Between A1 and A3 should be A2, A3
+    EXPECT_EQ(between_bb(SQ_A1, SQ_A3), square_bb(SQ_A2) | SQ_A3);
+    
+    // aligned
+    EXPECT_TRUE(aligned(SQ_A1, SQ_A8, SQ_A4));
+    EXPECT_FALSE(aligned(SQ_A1, SQ_A8, SQ_B4));
 }
