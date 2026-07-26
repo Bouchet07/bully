@@ -137,6 +137,9 @@ void print_interactive_help() {
     std::cout << "  " << style.yellow << "divide" << style.reset << " "
               << style.magenta << "<depth>" << style.reset
               << "             : Print move-by-move node counts (divide test).\n";
+    std::cout << "  " << style.yellow << "bench" << style.reset << " ["
+              << style.magenta << "<depth>" << style.reset
+              << "]                : Run standard search benchmark suite.\n";
     std::cout << "  " << style.yellow << "hash" << style.reset << " "
               << style.magenta << "<MB>" << style.reset
               << "                  : Resize transposition table (in Megabytes).\n";
@@ -170,6 +173,7 @@ void print_plain_help() {
     std::cout << "  eval                                : Print detailed static evaluation breakdown.\n";
     std::cout << "  perft <depth>                       : Measure speed & count leaf nodes recursively.\n";
     std::cout << "  divide <depth>                      : Print move-by-move node counts (divide test).\n";
+    std::cout << "  bench [<depth>]                     : Run standard search benchmark suite.\n";
     std::cout << "  hash <MB>                           : Resize transposition table (in Megabytes).\n";
     std::cout << "  threads <count>                     : Set the number of search threads.\n";
     std::cout << "  multipv <count>                     : Set the number of PV lines to show in search.\n";
