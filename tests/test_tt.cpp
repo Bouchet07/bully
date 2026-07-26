@@ -127,3 +127,41 @@ TEST_F(TTTest, ReplacementStrategy) {
     EXPECT_TRUE(TT.probe(k2, probed_move, probed_score, probed_eval, probed_depth, probed_bound, 0));
     EXPECT_TRUE(TT.probe(k3, probed_move, probed_score, probed_eval, probed_depth, probed_bound, 0));
 }
+
+// 5. Test aging replacement strategy
+TEST_F(TTTest, AgingReplacement) {
+    TT.resize(1);
+    TT.clear();
+
+    Key base_key = 0x1000;
+    Key k0 = base_key | (0ULL << 48);
+    Key k1 = base_key | (1ULL << 48);
+    Key k2 = base_key | (2ULL << 48);
+    Key k3 = base_key | (3ULL << 48);
+
+    // Write 3 entries to completely fill the cluster with age 0
+    TT.save(k0, Move(SQ_A1, SQ_A2), 10, 10, 15, BOUND_EXACT, 0);
+    TT.save(k1, Move(SQ_B1, SQ_B2), 20, 20, 15, BOUND_EXACT, 0);
+    TT.save(k2, Move(SQ_C1, SQ_C2), 30, 30, 15, BOUND_EXACT, 0);
+
+    // Call new_search() multiple times to age the existing entries
+    for (int i = 0; i < 5; ++i) {
+        TT.new_search();
+    }
+
+    // Now write a 4th entry k3 with a much shallower depth (depth 5)
+    // Normally, a depth 5 entry cannot replace a depth 15 entry in the same search generation.
+    // However, because the existing entries have aged, k3 should be able to replace one of them!
+    TT.save(k3, Move(SQ_D1, SQ_D2), 40, 40, 5, BOUND_EXACT, 0);
+
+    Move probed_move;
+    Value probed_score, probed_eval;
+    int probed_depth;
+    Bound probed_bound;
+
+    // k3 should successfully be saved
+    EXPECT_TRUE(TT.probe(k3, probed_move, probed_score, probed_eval, probed_depth, probed_bound, 0));
+    
+    // get_size_mb check
+    EXPECT_EQ(TT.get_size_mb(), 1);
+}
