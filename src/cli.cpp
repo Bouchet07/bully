@@ -7,6 +7,9 @@
 #include <chrono>
 
 #if defined(_WIN32)
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <io.h>
     #include <windows.h>
     #define ISATTY _isatty
@@ -86,7 +89,16 @@ void print_banner(bool use_utf8) {
     std::cout << style.blue << "========================================================\n" << style.reset;
     std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
     std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
+
+    #if defined(_MSC_VER)
+    std::cout << std::format("  {}Compiler{}     : {}MSVC {}{}\n", style.green, style.reset, style.magenta, _MSC_VER, style.reset);
+    #elif defined(__clang__)
+    std::cout << std::format("  {}Compiler{}     : {}Clang {}{}\n", style.green, style.reset, style.magenta, __clang_version__, style.reset);
+    #elif defined(__GNUC__)
     std::cout << std::format("  {}Compiler{}     : {}GCC {}{}\n", style.green, style.reset, style.magenta, __VERSION__, style.reset);
+    #else
+    std::cout << std::format("  {}Compiler{}     : {}Unknown{}\n", style.green, style.reset, style.magenta, style.reset);
+    #endif
     
     #if defined(USE_PEXT)
     std::cout << std::format("  {}Build{}        : {}BMI2 (PEXT){}\n", style.green, style.reset, style.magenta, style.reset);
