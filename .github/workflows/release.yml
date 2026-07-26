@@ -1,0 +1,159 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [generic, modern, avx2, bmi2]
+        exclude:
+          # Exclude avx2 and bmi2 on macOS. We will build a unified
+          # Apple Silicon + Intel Universal binary separately.
+          - os: macos-latest
+            arch: avx2
+          - os: macos-latest
+            arch: bmi2
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: ashutoshgngwr/setup-ninja@v1.1.2
+
+      - name: Setup MSVC (Windows only)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DBULLY_ARCH=${{ matrix.arch }} -DBUILD_TESTS=OFF -GNinja
+
+      - name: Build binary
+        run: |
+          cmake --build build
+
+      - name: Package Binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          copy build\bully*.exe bully-windows-${{ matrix.arch }}.exe
+
+      - name: Package Binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cp build/bully* bully-linux-${{ matrix.arch }}
+
+      - name: Package Binary (macOS Intel/ARM)
+        if: runner.os == 'macOS'
+        run: |
+          cp build/bully* bully-macos-${{ matrix.arch }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bully-${{ runner.os }}-${{ matrix.arch }}
+          path: bully-*
+
+  build-macos-universal:
+    name: Build macOS Universal (Intel + Apple Silicon)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: ashutoshgngwr/setup-ninja@v1.1.2
+
+      - name: Configure CMake for Universal Binary
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBULLY_ARCH=generic \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DBUILD_TESTS=OFF \
+            -GNinja
+
+      - name: Build Universal binary
+        run: |
+          cmake --build build
+
+      - name: Package Universal Binary
+        run: |
+          cp build/bully* bully-macos-universal
+
+      - name: Upload Universal Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bully-macOS-universal
+          path: bully-macos-universal
+
+  build-android:
+    name: Build Android ARM64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: ashutoshgngwr/setup-ninja@v1.1.2
+
+      - name: Configure CMake for Android ARM64
+        run: |
+          cmake -B build-android -S . \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -GNinja
+
+      - name: Build Android binary
+        run: |
+          cmake --build build-android
+
+      - name: Package Android Binary
+        run: |
+          cp build-android/bully* bully-android-arm64
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bully-Android-arm64
+          path: bully-android-arm64
+
+  release:
+    name: Create GitHub Release
+    needs: [build, build-macos-universal, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Display downloaded files
+        run: ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bully-*
+          generate_release_notes: true
