@@ -71,6 +71,7 @@ If you launch the engine binary directly in a terminal console, it automatically
 | `go [depth <D> \| infinite]` | Launches PVS search from the current position. |
 | `stop` | Safe, immediate termination of background search threads. |
 | `perft <depth>` | Runs recursive node generation speed tests. |
+| `bench [depth]` | Runs standard 8-position search benchmark suite. |
 | `hash <MB>` | Resizes the transposition table (TT) memory bounds. |
 | `syzygy <path>` | Loads/reloads endgame tablebases from path. |
 | `options` | Inspects and toggles engine heuristics search options. |

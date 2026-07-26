@@ -30,6 +30,9 @@ private:
     // Run divide test from the active position
     void run_divide(int depth, bool is_go_cmd);
 
+    // Run benchmark suite
+    void run_benchmark(int depth);
+
     // Parse move string (e.g. "e2e4") to a legal Move object
     Move parse_move(const std::string& move_str);
 

@@ -67,5 +67,8 @@ void start(const Position& pos, const Limits& limits, std::list<StateInfo>& hist
 // Gracefully stop any running search and block until all worker threads are joined
 void stop_and_join();
 
+// Get the total nodes searched in the last completed search run
+uint64_t get_last_search_nodes();
+
 } // namespace Search
 } // namespace Bully

@@ -864,6 +864,11 @@ bool UCI::execute_line(const std::string& line) {
                 }
             }
         }
+        else if (token == "bench") {
+            int depth = 10;
+            is >> depth;
+            run_benchmark(depth);
+        }
         else if (token == "quit" || token == "exit") {
             Search::stop_and_join();
             return false;
@@ -923,6 +928,93 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
 
 void UCI::print_arguments_help() {
     print_arguments_guide(use_color);
+}
+
+void UCI::run_benchmark(int depth) {
+    if (depth < 1) depth = 10;
+
+    const std::vector<std::string> BENCH_FENS = {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+        "r1b1kb1r/pppp1ppp/5n2/4q3/4P3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7",
+        "8/8/8/8/8/4k3/4P3/4K3 w - - 0 1",
+        "8/p7/8/1P6/K1k3p1/6Q1/8/8 w - - 0 1",
+        "r2q1rk1/pb1nbppp/1p2p3/2ppP3/3P4/2PB1N2/PP1NQPPP/R4RK1 w - - 0 12",
+        "r1bqk2r/pp2bppp/2n1pn2/2pp2B1/3P4/2PBPN2/PP3PPP/RN1QK2R w KQkq - 3 7"
+    };
+
+    if (is_interactive()) {
+        std::cout << std::format("{}Bully Chess Engine - Benchmark Suite{}\n", style.cyan, style.reset);
+        std::cout << std::format("Parameters: Depth {}{}{}, Threads {}{}{}, Hash {}{}{} MB\n", 
+                                 style.magenta, depth, style.reset,
+                                 style.magenta, Search::num_threads, style.reset,
+                                 style.magenta, TT.get_size_mb(), style.reset);
+        std::cout << style.blue << "========================================================================\n" << style.reset;
+        std::cout << std::format(" {:<3} | {:<55} | {:<10}\n", "Num", "FEN (Truncated)", "NPS");
+        std::cout << style.blue << "------------------------------------------------------------------------\n" << style.reset;
+    } else {
+        std::cout << std::format("Running benchmark depth {} threads {} hash {} MB...\n", depth, Search::num_threads, TT.get_size_mb());
+    }
+
+    uint64_t total_nodes = 0;
+    int64_t total_time_ms = 0;
+    int num = 1;
+
+    for (const auto& fen : BENCH_FENS) {
+        Search::stop_and_join();
+        history.clear();
+        history.emplace_back();
+        pos.set_fen(fen, history.back());
+        TT.clear();
+
+        Search::Limits limits;
+        limits.depth = depth;
+
+        auto start = std::chrono::high_resolution_clock::now();
+        Search::start(pos, limits, history);
+
+        while (!Search::stopped.load(std::memory_order_relaxed)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        Search::stop_and_join();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        if (duration_ms < 1) duration_ms = 1;
+
+        uint64_t nodes = Search::get_last_search_nodes();
+        double nps = (static_cast<double>(nodes) * 1000.0) / static_cast<double>(duration_ms);
+
+        total_nodes += nodes;
+        total_time_ms += duration_ms;
+
+        std::string fen_display = fen;
+        if (fen_display.length() > 55) {
+            fen_display = fen_display.substr(0, 52) + "...";
+        }
+
+        if (is_interactive()) {
+            std::cout << std::format("  {:>2}  | {:<55} | {}{:<10.0f}{}\n", 
+                                     num++, fen_display, style.magenta, nps, style.reset);
+        } else {
+            std::cout << std::format("Position {:>2} : FEN: {} | Nodes: {} | Time: {} ms | NPS: {:.0f}\n", 
+                                     num++, fen, nodes, duration_ms, nps);
+        }
+    }
+
+    double overall_nps = (static_cast<double>(total_nodes) * 1000.0) / static_cast<double>(total_time_ms);
+
+    if (is_interactive()) {
+        std::cout << style.blue << "========================================================================\n" << style.reset;
+        std::cout << std::format("{}Total Nodes{}  : {}{}{}\n", style.green, style.reset, style.magenta, total_nodes, style.reset);
+        std::cout << std::format("{}Total Time{}   : {}{}{} ms\n", style.green, style.reset, style.magenta, total_time_ms, style.reset);
+        std::cout << std::format("{}Overall NPS{}  : {}{:<10.0f}{}\n", style.green, style.reset, style.magenta, overall_nps, style.reset);
+        std::cout << style.blue << "========================================================================\n" << style.reset;
+    } else {
+        std::cout << std::format("\nTotal Nodes: {}\nTotal Time: {} ms\nOverall NPS: {:.0f}\n", 
+                                 total_nodes, total_time_ms, overall_nps);
+    }
 }
 
 } // namespace Bully

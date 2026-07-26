@@ -72,3 +72,16 @@ TEST_F(UCITest, PositionExecution) {
     // This command updates the position. It should run successfully.
     EXPECT_TRUE(uci.execute_line("position startpos moves e2e4 e7e5"));
 }
+
+// 5. Verify benchmark execution flow at depth 1
+TEST_F(UCITest, BenchmarkExecution) {
+    UCI uci;
+    
+    // Divert stdout to capture benchmark results
+    testing::internal::CaptureStdout();
+    bool keep_running = uci.execute_line("bench 1");
+    std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_TRUE(keep_running);
+    EXPECT_TRUE(output.find("Total Nodes") != std::string::npos || output.find("Total Nodes:") != std::string::npos);
+}

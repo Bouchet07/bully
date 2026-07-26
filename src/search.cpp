@@ -22,6 +22,7 @@ namespace Search {
 std::atomic<bool> stopped(true);
 std::atomic<bool> pondering(false);
 std::atomic<int64_t> search_start_time_ms(0);
+std::atomic<uint64_t> last_search_nodes(0);
 int num_threads = 1;
 int multipv_count = 1;
 bool use_nmp = true;
@@ -905,7 +906,17 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
     }
 
+    uint64_t total = 0;
+    for (const auto& w : workers) {
+        total += w->ss.nodes;
+    }
+    last_search_nodes.store(total, std::memory_order_relaxed);
+
     std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+}
+
+uint64_t get_last_search_nodes() {
+    return last_search_nodes.load(std::memory_order_relaxed);
 }
 
 void stop_and_join() {
