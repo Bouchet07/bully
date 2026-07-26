@@ -268,12 +268,11 @@ bool Position::in_check() const {
 }
 
 bool Position::make_move(Move m, StateInfo& new_state) {
+    new_state = *st;
     new_state.previous = st;
     new_state.captured_piece = NO_PIECE;
-    new_state.castling_rights = st->castling_rights;
     new_state.en_passant_square = SQ_NONE;
-    new_state.rule50 = st->rule50 + 1;
-    new_state.key = st->key;
+    new_state.rule50++;
 
     Square from = m.from_sq();
     Square to = m.to_sq();
@@ -312,41 +311,43 @@ bool Position::make_move(Move m, StateInfo& new_state) {
         new_state.rule50 = 0;
     }
 
-    new_state.key ^= PieceKeys[to_index(pc)][to_index(from)];
-    remove_piece(from);
-
     if (type == NORMAL) {
-        add_piece(pc, to);
-        new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
+        move_piece_internal(from, to);
+        new_state.key ^= PieceKeys[to_index(pc)][to_index(from)] ^ PieceKeys[to_index(pc)][to_index(to)];
 
         if (pt == PAWN && std::abs(std::to_underlying(to) - std::to_underlying(from)) == 16) {
             new_state.en_passant_square = static_cast<Square>((std::to_underlying(from) + std::to_underlying(to)) / 2);
             new_state.key ^= EnPassantKeys[to_index(new_state.en_passant_square)];
         }
-    } else if (type == PROMOTION) {
-        PieceType promo_pt = m.promotion_type();
-        Piece promo_pc = make_piece(us, promo_pt);
-        add_piece(promo_pc, to);
-        new_state.key ^= PieceKeys[to_index(promo_pc)][to_index(to)];
-    } else if (type == EN_PASSANT) {
-        add_piece(pc, to);
-        new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
-    } else if (type == CASTLING) {
-        Square r_from = SQ_NONE;
-        Square r_to = SQ_NONE;
-        if (to == SQ_G1) { r_from = SQ_H1; r_to = SQ_F1; }
-        else if (to == SQ_C1) { r_from = SQ_A1; r_to = SQ_D1; }
-        else if (to == SQ_G8) { r_from = SQ_H8; r_to = SQ_F8; }
-        else if (to == SQ_C8) { r_from = SQ_A8; r_to = SQ_D8; }
+    } else {
+        new_state.key ^= PieceKeys[to_index(pc)][to_index(from)];
+        remove_piece(from);
 
-        Piece rook = board[to_index(r_from)];
-        new_state.key ^= PieceKeys[to_index(rook)][to_index(r_from)];
-        remove_piece(r_from);
-        add_piece(rook, r_to);
-        new_state.key ^= PieceKeys[to_index(rook)][to_index(r_to)];
+        if (type == PROMOTION) {
+            PieceType promo_pt = m.promotion_type();
+            Piece promo_pc = make_piece(us, promo_pt);
+            add_piece(promo_pc, to);
+            new_state.key ^= PieceKeys[to_index(promo_pc)][to_index(to)];
+        } else if (type == EN_PASSANT) {
+            add_piece(pc, to);
+            new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
+        } else if (type == CASTLING) {
+            Square r_from = SQ_NONE;
+            Square r_to = SQ_NONE;
+            if (to == SQ_G1) { r_from = SQ_H1; r_to = SQ_F1; }
+            else if (to == SQ_C1) { r_from = SQ_A1; r_to = SQ_D1; }
+            else if (to == SQ_G8) { r_from = SQ_H8; r_to = SQ_F8; }
+            else if (to == SQ_C8) { r_from = SQ_A8; r_to = SQ_D8; }
 
-        add_piece(pc, to);
-        new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
+            Piece rook = board[to_index(r_from)];
+            new_state.key ^= PieceKeys[to_index(rook)][to_index(r_from)];
+            remove_piece(r_from);
+            add_piece(rook, r_to);
+            new_state.key ^= PieceKeys[to_index(rook)][to_index(r_to)];
+
+            add_piece(pc, to);
+            new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
+        }
     }
 
     new_state.castling_rights = static_cast<CastlingRights>(
@@ -390,8 +391,7 @@ void Position::unmake_move(Move m) {
         remove_piece(r_to);
         add_piece(make_piece(us, ROOK), r_from);
     } else {
-        remove_piece(to);
-        add_piece(pc, from);
+        move_piece_internal(to, from);
     }
 
     Piece captured = st->captured_piece;
