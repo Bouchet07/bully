@@ -19,7 +19,7 @@ struct ExtMove {
 // Lightweight move list container with zero heap allocations
 class MoveList {
 public:
-    MoveList() = default;
+    MoveList() : last(list.data()) {}
 
     // Generate all pseudo-legal moves for a position
     void generate(const Position& pos);
@@ -29,29 +29,27 @@ public:
 
     // Iterators for range-based for loops
     [[nodiscard]] const ExtMove* begin() const { return list.data(); }
-    [[nodiscard]] const ExtMove* end() const { return list.data() + count; }
+    [[nodiscard]] const ExtMove* end() const { return last; }
 
     [[nodiscard]] ExtMove* begin() { return list.data(); }
-    [[nodiscard]] ExtMove* end() { return list.data() + count; }
+    [[nodiscard]] ExtMove* end() { return last; }
     
-    [[nodiscard]] size_t size() const { return count; }
-    [[nodiscard]] bool empty() const { return count == 0; }
+    [[nodiscard]] size_t size() const { return static_cast<size_t>(last - list.data()); }
+    [[nodiscard]] bool empty() const { return last == list.data(); }
 
     [[nodiscard]] const ExtMove& operator[](size_t index) const { return list[index]; }
     [[nodiscard]] ExtMove& operator[](size_t index) { return list[index]; }
 
     // Helper to add a move directly (for testing or manual generation)
     void push(Move m) {
-        if (count < MAX_MOVES) {
-            list[count].move = m;
-            list[count].value = 0;
-            count++;
-        }
+        last->move = m;
+        last->value = 0;
+        last++;
     }
 
 private:
     std::array<ExtMove, MAX_MOVES> list;
-    size_t count = 0;
+    ExtMove* last;
 };
 
 } // namespace Bully
