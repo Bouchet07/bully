@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <format>
 
 namespace Bully {
 namespace Syzygy {
