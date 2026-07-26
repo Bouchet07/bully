@@ -45,6 +45,13 @@ set(ENGINE_HEADERS
     src/cli.h
 )
 
+# Copy customized tablebase config to the submodule directory at configure time
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tbconfig.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Pyrrhic/tbconfig.h
+    COPYONLY
+)
+
 # Define static library for the engine to share with the executable and tests
 add_library(engine_lib STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 set_source_files_properties(Pyrrhic/tbprobe.c PROPERTIES 
