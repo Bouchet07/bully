@@ -40,6 +40,14 @@
 # debug information files
 *.dwo
 
-# CMake files
+# CMake and build files
 .vs/*
 out/*
+build/
+
+# Bully tournament results, logs, and testing binaries
+engines/
+results/
+*.pgn
+ratings_test.txt
+AGENTS.md

@@ -1,0 +1,515 @@
+{
+  "tests": 79,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "UCITest",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "Handshake",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_uci.cpp",
+          "line": 24
+        },
+        {
+          "name": "SetOption",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_uci.cpp",
+          "line": 44
+        },
+        {
+          "name": "QuitTermination",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_uci.cpp",
+          "line": 61
+        },
+        {
+          "name": "PositionExecution",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_uci.cpp",
+          "line": 69
+        }
+      ]
+    },
+    {
+      "name": "SyzygyTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "LoadStatus",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_syzygy.cpp",
+          "line": 20
+        },
+        {
+          "name": "ProbeWDL",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_syzygy.cpp",
+          "line": 27
+        },
+        {
+          "name": "ProbeRoot",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_syzygy.cpp",
+          "line": 46
+        }
+      ]
+    },
+    {
+      "name": "SearchTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "LimitsCheck",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_search.cpp",
+          "line": 23
+        },
+        {
+          "name": "SearchLifecycle",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_search.cpp",
+          "line": 38
+        },
+        {
+          "name": "InfiniteSearchStopping",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_search.cpp",
+          "line": 59
+        }
+      ]
+    },
+    {
+      "name": "EvaluationTest",
+      "tests": 7,
+      "testsuite": [
+        {
+          "name": "StartposSymmetry",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 20
+        },
+        {
+          "name": "MaterialImbalance",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 40
+        },
+        {
+          "name": "PawnPSTAdvancement",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 57
+        },
+        {
+          "name": "DoubledPawnPenalty",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 75
+        },
+        {
+          "name": "IsolatedPawnPenalty",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 93
+        },
+        {
+          "name": "BishopPairBonus",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 111
+        },
+        {
+          "name": "TaperedPhaseBlending",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_evaluation.cpp",
+          "line": 129
+        }
+      ]
+    },
+    {
+      "name": "TTTest",
+      "tests": 6,
+      "testsuite": [
+        {
+          "name": "ResizeAndClear",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 16
+        },
+        {
+          "name": "SaveAndProbe",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 30
+        },
+        {
+          "name": "MateScoreNormalization",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 61
+        },
+        {
+          "name": "ReplacementStrategy",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 91
+        },
+        {
+          "name": "AgingReplacement",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 132
+        },
+        {
+          "name": "MemoryAlignment",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_tt.cpp",
+          "line": 170
+        }
+      ]
+    },
+    {
+      "name": "MoveGenTest",
+      "tests": 5,
+      "testsuite": [
+        {
+          "name": "PerftStartingPosition",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_movegen.cpp",
+          "line": 40
+        },
+        {
+          "name": "PerftKiwipete",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_movegen.cpp",
+          "line": 52
+        },
+        {
+          "name": "PerftPosition3",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_movegen.cpp",
+          "line": 63
+        },
+        {
+          "name": "PerftPosition4",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_movegen.cpp",
+          "line": 97
+        },
+        {
+          "name": "GenerateCaptures",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_movegen.cpp",
+          "line": 108
+        }
+      ]
+    },
+    {
+      "name": "PositionTest",
+      "tests": 6,
+      "testsuite": [
+        {
+          "name": "StartingPositionFEN",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 18
+        },
+        {
+          "name": "IncrementalZobristKey",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 35
+        },
+        {
+          "name": "AttackAndCheckDetections",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 63
+        },
+        {
+          "name": "CastlingRightsUpdates",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 76
+        },
+        {
+          "name": "NullMoves",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 103
+        },
+        {
+          "name": "StaticExchangeEvaluation",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_position.cpp",
+          "line": 125
+        }
+      ]
+    },
+    {
+      "name": "ColorTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 10
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 19
+        },
+        {
+          "name": "ToggleColor",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 287
+        }
+      ]
+    },
+    {
+      "name": "CastlingRightsTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "CastlingRights",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 27
+        },
+        {
+          "name": "CastlingRightsAndColor",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 334
+        }
+      ]
+    },
+    {
+      "name": "BoundTest",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "BoundValues",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 36
+        }
+      ]
+    },
+    {
+      "name": "PieceTypeTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 43
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 60
+        }
+      ]
+    },
+    {
+      "name": "PieceTest",
+      "tests": 6,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 78
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 105
+        },
+        {
+          "name": "SwapColor",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 322
+        },
+        {
+          "name": "MakePiece",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 354
+        },
+        {
+          "name": "TypeOfPiece",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 370
+        },
+        {
+          "name": "ColorOfPiece",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 386
+        }
+      ]
+    },
+    {
+      "name": "SquareTest",
+      "tests": 11,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 132
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 154
+        },
+        {
+          "name": "SumDirectionOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 273
+        },
+        {
+          "name": "FlipRank",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 296
+        },
+        {
+          "name": "FlipFile",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 309
+        },
+        {
+          "name": "MakeSquare",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 342
+        },
+        {
+          "name": "IsValidSquare",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 402
+        },
+        {
+          "name": "FileOfSquare",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 415
+        },
+        {
+          "name": "RankOfSquare",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 427
+        },
+        {
+          "name": "RelativeSquare",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 439
+        },
+        {
+          "name": "RelativeRank",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 449
+        }
+      ]
+    },
+    {
+      "name": "FileTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 175
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 196
+        }
+      ]
+    },
+    {
+      "name": "RankTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "IncrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 215
+        },
+        {
+          "name": "DecrementOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 236
+        }
+      ]
+    },
+    {
+      "name": "DirectionTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "SumOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 255
+        },
+        {
+          "name": "MultiplicationOperators",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 264
+        },
+        {
+          "name": "PawnPushDirection",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 455
+        }
+      ]
+    },
+    {
+      "name": "MoveTest",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "FromTo",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 461
+        },
+        {
+          "name": "Equality",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 481
+        },
+        {
+          "name": "ToStringAndSpecial",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 493
+        },
+        {
+          "name": "ToIndexHelper",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_types.cpp",
+          "line": 513
+        }
+      ]
+    },
+    {
+      "name": "BitboardTest",
+      "tests": 4,
+      "testsuite": [
+        {
+          "name": "Popcnt",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 9
+        },
+        {
+          "name": "GetLSB",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 24
+        },
+        {
+          "name": "OperationsAndShifts",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 122
+        },
+        {
+          "name": "DistanceAndLookups",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 173
+        }
+      ]
+    },
+    {
+      "name": "AttacksTest",
+      "tests": 5,
+      "testsuite": [
+        {
+          "name": "KnightAttacks",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 42
+        },
+        {
+          "name": "KingAttacks",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 57
+        },
+        {
+          "name": "PawnAttacks",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 70
+        },
+        {
+          "name": "RookAttacks",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 84
+        },
+        {
+          "name": "BishopAttacks",
+          "file": "C:\/Users\/diego\/Desktop\/Programming\/c++\/bully\/tests\/test_bitboard.cpp",
+          "line": 102
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../src/types.h"
 
+using namespace Bully;
+
 
 // Test ENABLE_INCR_OPERATORS_ON
 
@@ -17,7 +19,6 @@ TEST(ColorTest, IncrementOperators) {
 TEST(ColorTest, DecrementOperators) {
 	Color both = BOTH;
 	Color black = BLACK;
-	Color white = WHITE;
 	EXPECT_EQ(--both, BLACK);
 	EXPECT_EQ(--black, WHITE);
 }
@@ -46,7 +47,6 @@ TEST(PieceTypeTest, IncrementOperators) {
 	PieceType bishop = BISHOP;
 	PieceType rook = ROOK;
 	PieceType queen = QUEEN;
-	PieceType king = KING;
 
 	EXPECT_EQ(++no_piece, PAWN);
 	EXPECT_EQ(++pawn, KNIGHT);
@@ -81,7 +81,6 @@ TEST(PieceTest, IncrementOperators) {
 	Piece w_bishop = W_BISHOP;
 	Piece w_rook = W_ROOK;
 	Piece w_queen = W_QUEEN;
-	Piece w_king = W_KING;
 
 	EXPECT_EQ(++w_pawn, W_KNIGHT);
 	EXPECT_EQ(++w_knight, W_BISHOP);
@@ -94,7 +93,6 @@ TEST(PieceTest, IncrementOperators) {
 	Piece b_bishop = B_BISHOP;
 	Piece b_rook = B_ROOK;
 	Piece b_queen = B_QUEEN;
-	Piece b_king = B_KING;
 
 	EXPECT_EQ(++b_pawn, B_KNIGHT);
 	EXPECT_EQ(++b_knight, B_BISHOP);
@@ -110,7 +108,6 @@ TEST(PieceTest, DecrementOperators) {
 	Piece b_rook = B_ROOK;
 	Piece b_bishop = B_BISHOP;
 	Piece b_knight = B_KNIGHT;
-	Piece b_pawn = B_PAWN;
 
 	EXPECT_EQ(--b_king, B_QUEEN);
 	EXPECT_EQ(--b_queen, B_ROOK);
@@ -123,7 +120,6 @@ TEST(PieceTest, DecrementOperators) {
 	Piece w_rook = W_ROOK;
 	Piece w_bishop = W_BISHOP;
 	Piece w_knight = W_KNIGHT;
-	Piece w_pawn = W_PAWN;
 
 	EXPECT_EQ(--w_king, W_QUEEN);
 	EXPECT_EQ(--w_queen, W_ROOK);
@@ -205,7 +201,6 @@ TEST(FileTest, DecrementOperators) {
 	File file_d = FILE_D;
 	File file_c = FILE_C;
 	File file_b = FILE_B;
-	File file_a = FILE_A;
 
 	EXPECT_EQ(--file_h, FILE_G);
 	EXPECT_EQ(--file_g, FILE_F);
@@ -246,7 +241,6 @@ TEST(RankTest, DecrementOperators) {
 	Rank rank_4 = RANK_4;
 	Rank rank_3 = RANK_3;
 	Rank rank_2 = RANK_2;
-	Rank rank_1 = RANK_1;
 
 	EXPECT_EQ(--rank_8, RANK_7);
 	EXPECT_EQ(--rank_7, RANK_6);
@@ -281,8 +275,6 @@ TEST(SquareTest, SumDirectionOperators) {
 	Square sq_h1 = SQ_H1;
 	Direction n = NORTH;
 	Direction e = EAST;
-	Direction s = SOUTH;
-	Direction w = WEST;
 
 	EXPECT_EQ(sq_a1 + n, SQ_A2);
 	EXPECT_EQ(sq_a1 + e, SQ_B1);
@@ -495,4 +487,33 @@ TEST(MoveTest, Equality) {
 	EXPECT_FALSE(m2 == m3);
 	EXPECT_TRUE(m1 != m3);
 	EXPECT_TRUE(m2 != m3);
+}
+
+// Move string and special moves
+TEST(MoveTest, ToStringAndSpecial) {
+	EXPECT_EQ(Move::none().to_string(), "none");
+	EXPECT_EQ(Move::null().to_string(), "0000");
+
+	Move m1 = Move(SQ_E2, SQ_E4);
+	EXPECT_EQ(m1.to_string(), "e2e4");
+	EXPECT_TRUE(m1.is_ok());
+
+	Move m2 = Move::make<PROMOTION>(SQ_D7, SQ_D8, QUEEN);
+	EXPECT_EQ(m2.to_string(), "d7d8q");
+	EXPECT_TRUE(m2.is_ok());
+
+	Move m3 = Move::make<PROMOTION>(SQ_C7, SQ_B8, KNIGHT);
+	EXPECT_EQ(m3.to_string(), "c7b8n");
+
+	EXPECT_FALSE(Move::none().is_ok());
+	EXPECT_FALSE(Move::null().is_ok());
+}
+
+// to_index helper
+TEST(MoveTest, ToIndexHelper) {
+	EXPECT_EQ(to_index(SQ_A1), 0);
+	EXPECT_EQ(to_index(SQ_H8), 63);
+	EXPECT_EQ(to_index(WHITE), 0);
+	EXPECT_EQ(to_index(BLACK), 1);
+	EXPECT_EQ(to_index(PAWN), 1);
 }
