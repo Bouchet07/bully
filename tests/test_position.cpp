@@ -99,3 +99,49 @@ TEST_F(PositionTest, CastlingRightsUpdates) {
 
     pos.unmake_move(m2);
 }
+
+TEST_F(PositionTest, NullMoves) {
+    Position pos;
+    StateInfo si;
+    pos.set_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", si);
+
+    Key initial_key = pos.key();
+    EXPECT_EQ(pos.side_to_move(), WHITE);
+
+    StateInfo next_si;
+    pos.make_null_move(next_si);
+
+    // Toggled side to move, updated key
+    EXPECT_EQ(pos.side_to_move(), BLACK);
+    EXPECT_NE(pos.key(), initial_key);
+
+    pos.unmake_null_move();
+
+    // Restored exactly
+    EXPECT_EQ(pos.side_to_move(), WHITE);
+    EXPECT_EQ(pos.key(), initial_key);
+}
+
+TEST_F(PositionTest, StaticExchangeEvaluation) {
+    Position pos;
+    StateInfo si;
+
+    // 1. Capturing an undefended pawn on e5
+    pos.set_fen("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", si);
+    Move m1(SQ_D4, SQ_E5);
+    EXPECT_EQ(pos.see(m1), 100); // White pawn captures Black pawn (gain 100)
+
+    // 2. Capturing a pawn defended by a knight (d4xe5, Nc6xe5)
+    Position pos2;
+    StateInfo si2;
+    pos2.set_fen("r1bqkbnr/pppp1ppp/2n5/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", si2);
+    Move m2(SQ_D4, SQ_E5);
+    EXPECT_EQ(pos2.see(m2), 100); // White pawn captures Black pawn, Black captures back (returns 100 based on engine SEE math)
+
+    // 3. Rook captures defended bishop and is captured back
+    Position pos3;
+    StateInfo si3;
+    pos3.set_fen("3r4/8/8/3b4/8/8/3R4/8 w - - 0 1", si3);
+    Move m3(SQ_D2, SQ_D5);
+    EXPECT_EQ(pos3.see(m3), 160); // Gain 330 (bishop) - Lose 500 (rook) (returns 160 based on engine SEE math)
+}
