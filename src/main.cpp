@@ -1,6 +1,7 @@
 #include "bitboard.h"
 #include "attacks.h"
 #include "position.h"
+#include "evaluation.h"
 #include "uci.h"
 #include "search.h"
 
@@ -13,6 +14,7 @@ int main(int argc, char** argv) {
     Bully::init_bitboards();
     Bully::init_attacks();
     Bully::init_zobrist();
+    Bully::Eval::init_eval();
 
     Bully::UCI uci;
     uci.init();

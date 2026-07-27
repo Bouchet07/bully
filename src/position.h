@@ -28,6 +28,9 @@ struct StateInfo {
     int rule50 = 0;
     Key key = 0;
     Piece captured_piece = NO_PIECE;
+    int16_t psq_mg = 0;
+    int16_t psq_eg = 0;
+    int16_t game_phase = 0;
     StateInfo* previous = nullptr;
 };
 
