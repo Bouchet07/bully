@@ -983,14 +983,11 @@ void UCI::run_benchmark(int depth) {
 
         Search::Limits limits;
         limits.depth = depth;
+        limits.silent = true;
 
         auto start = std::chrono::high_resolution_clock::now();
         Search::start(pos, limits, history);
-
-        while (!Search::stopped.load(std::memory_order_relaxed)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        Search::stop_and_join();
+        Search::wait_for_search();
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -1023,11 +1020,13 @@ void UCI::run_benchmark(int depth) {
         std::cout << std::format("{}Total Nodes{}  : {}{}{}\n", style.green, style.reset, style.magenta, total_nodes, style.reset);
         std::cout << std::format("{}Total Time{}   : {}{}{} ms\n", style.green, style.reset, style.magenta, total_time_ms, style.reset);
         std::cout << std::format("{}Overall NPS{}  : {}{:<10.0f}{}\n", style.green, style.reset, style.magenta, overall_nps, style.reset);
-        std::cout << style.blue << "========================================================================\n" << style.reset;
+        std::cout << style.blue << "========================================================================\n" << style.reset << std::flush;
     } else {
         std::cout << std::format("\nTotal Nodes: {}\nTotal Time: {} ms\nOverall NPS: {:.0f}\n", 
-                                 total_nodes, total_time_ms, overall_nps);
+                                 total_nodes, total_time_ms, overall_nps) << std::flush;
     }
+    std::cout.flush();
+    fflush(stdout);
 }
 
 } // namespace Bully

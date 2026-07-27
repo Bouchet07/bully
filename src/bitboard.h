@@ -29,6 +29,13 @@ namespace Bully {
     return static_cast<Square>(std::countr_zero(b));
 }
 
+// Returns the index of the least significant bit set and clears it from the bitboard.
+inline Square pop_lsb(Bitboard& b) {
+    Square s = lsb(b);
+    b &= b - 1;
+    return s;
+}
+
 // ============================================================================
 // File & Rank Bitboard Masks
 // ============================================================================

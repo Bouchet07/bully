@@ -21,6 +21,7 @@ struct Limits {
     int movetime = -1;    // Fixed search time per move (ms)
     bool infinite = false;// Search until explicit 'stop' command
     bool ponder = false;  // Search in background for anticipated opponent move
+    bool silent = false;  // Suppress output (used in benchmarks / tests)
 
     [[nodiscard]] bool time_controlled() const {
         return wtime != -1 || btime != -1 || movetime != -1;
@@ -63,6 +64,9 @@ struct SearchState {
 
 // Start searching a position on a separate thread
 void start(const Position& pos, const Limits& limits, std::list<StateInfo>& history);
+
+// Wait for running search thread to complete naturally without requesting premature stop
+void wait_for_search();
 
 // Gracefully stop any running search and block until all worker threads are joined
 void stop_and_join();

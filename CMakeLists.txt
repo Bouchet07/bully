@@ -107,9 +107,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 
     target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 
-    # If BMI2 was enabled, ensure public dependency compiles with -mbmi2 and defines USE_PEXT
-    if(BULLY_ARCH STREQUAL "bmi2")
-        target_compile_options(engine_lib PUBLIC -mbmi2)
+    # If BMI2 or native is enabled, define USE_PEXT for hardware accelerated slider lookups
+    if(BULLY_ARCH STREQUAL "bmi2" OR BULLY_ARCH STREQUAL "native")
         target_compile_definitions(engine_lib PUBLIC USE_PEXT)
     endif()
 

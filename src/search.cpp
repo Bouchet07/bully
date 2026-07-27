@@ -157,8 +157,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 
     ss.seldepth = std::max(ss.seldepth, ply);
 
-    Color us = pos.side_to_move();
-    bool in_check = pos.attacked(pos.king_square(us), ~us);
+    bool in_check = pos.in_check();
 
     Value stand_pat = VALUE_NONE;
     if (!in_check) {
@@ -270,7 +269,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     Color us = pos.side_to_move();
-    bool in_check = pos.attacked(pos.king_square(us), ~us);
+    bool in_check = pos.in_check();
     int extension = (use_check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
 
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
@@ -533,9 +532,12 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     Value tb_score = VALUE_NONE;
     if (Syzygy::probe_root(pos, best_tb_move, tb_score)) {
         best_move = best_tb_move;
-        int cp_score = (tb_score > 0 ? 10000 : (tb_score < 0 ? -10000 : 0));
-        std::cout << std::format("info depth 1 seldepth 1 score cp {} nodes 1 nps 0 time 0 pv {}\n", cp_score, best_move.to_string());
-        std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+        if (!limits.silent) {
+            int cp_score = (tb_score > 0 ? 10000 : (tb_score < 0 ? -10000 : 0));
+            std::cout << std::format("info depth 1 seldepth 1 score cp {} nodes 1 nps 0 time 0 pv {}\n", cp_score, best_move.to_string());
+            std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+        }
+        stopped.store(true, std::memory_order_relaxed);
         return;
     }
 
@@ -603,7 +605,10 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     }
 
     if (root_moves.empty()) {
-        std::cout << "bestmove none\n" << std::flush;
+        if (!limits.silent) {
+            std::cout << "bestmove none\n" << std::flush;
+        }
+        stopped.store(true, std::memory_order_relaxed);
         return;
     }
 
@@ -720,21 +725,23 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             double secs = static_cast<double>(elapsed) / 1000.0;
             double nps = (secs > 0.0) ? (static_cast<double>(total_nodes) / secs) : 0.0;
 
-            int n_pv = std::min(multipv_count, static_cast<int>(root_moves.size()));
-            for (int i = 0; i < n_pv; ++i) {
-                Value score = root_moves[static_cast<size_t>(i)].score;
-                if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
-                    int mate_plies = VALUE_MATE - std::abs(score);
-                    int mate_moves = (mate_plies + 1) / 2;
-                    if (score < 0) mate_moves = -mate_moves;
-                    std::cout << std::format("info depth {} seldepth {} multipv {} score mate {} nodes {} nps {:.0f} time {} pv {}\n",
-                                             d, max_seldepth, i + 1, mate_moves, total_nodes, nps, elapsed, root_moves[static_cast<size_t>(i)].pv_str);
-                } else {
-                    std::cout << std::format("info depth {} seldepth {} multipv {} score cp {} nodes {} nps {:.0f} time {} pv {}\n",
-                                             d, max_seldepth, i + 1, score, total_nodes, nps, elapsed, root_moves[static_cast<size_t>(i)].pv_str);
+            if (!limits.silent) {
+                int n_pv = std::min(multipv_count, static_cast<int>(root_moves.size()));
+                for (int i = 0; i < n_pv; ++i) {
+                    Value score = root_moves[static_cast<size_t>(i)].score;
+                    if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
+                        int mate_plies = VALUE_MATE - std::abs(score);
+                        int mate_moves = (mate_plies + 1) / 2;
+                        if (score < 0) mate_moves = -mate_moves;
+                        std::cout << std::format("info depth {} seldepth {} multipv {} score mate {} nodes {} nps {:.0f} time {} pv {}\n",
+                                                 d, max_seldepth, i + 1, mate_moves, total_nodes, nps, elapsed, root_moves[static_cast<size_t>(i)].pv_str);
+                    } else {
+                        std::cout << std::format("info depth {} seldepth {} multipv {} score cp {} nodes {} nps {:.0f} time {} pv {}\n",
+                                                 d, max_seldepth, i + 1, score, total_nodes, nps, elapsed, root_moves[static_cast<size_t>(i)].pv_str);
+                    }
                 }
+                std::cout << std::flush;
             }
-            std::cout << std::flush;
 
             if (root_moves[0].move != Move::none()) {
                 best_move = root_moves[0].move;
@@ -855,17 +862,19 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 current_depth++;
             }
 
-            if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
-                int mate_plies = VALUE_MATE - std::abs(score);
-                int mate_moves = (mate_plies + 1) / 2;
-                if (score < 0) mate_moves = -mate_moves;
-                std::cout << std::format("info depth {} seldepth {} score mate {} nodes {} nps {:.0f} time {} pv {}\n",
-                                         d, max_seldepth, mate_moves, total_nodes, nps, elapsed, pv_str);
-            } else {
-                std::cout << std::format("info depth {} seldepth {} score cp {} nodes {} nps {:.0f} time {} pv {}\n",
-                                         d, max_seldepth, score, total_nodes, nps, elapsed, pv_str);
+            if (!limits.silent) {
+                if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
+                    int mate_plies = VALUE_MATE - std::abs(score);
+                    int mate_moves = (mate_plies + 1) / 2;
+                    if (score < 0) mate_moves = -mate_moves;
+                    std::cout << std::format("info depth {} seldepth {} score mate {} nodes {} nps {:.0f} time {} pv {}\n",
+                                             d, max_seldepth, mate_moves, total_nodes, nps, elapsed, pv_str);
+                } else {
+                    std::cout << std::format("info depth {} seldepth {} score cp {} nodes {} nps {:.0f} time {} pv {}\n",
+                                             d, max_seldepth, score, total_nodes, nps, elapsed, pv_str);
+                }
+                std::cout << std::flush;
             }
-            std::cout << std::flush;
 
             if (limits.time_controlled() && elapsed >= time_limit) {
                 break;
@@ -909,11 +918,19 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     }
     last_search_nodes.store(total, std::memory_order_relaxed);
 
-    std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+    if (!limits.silent) {
+        std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
+    }
 }
 
 uint64_t get_last_search_nodes() {
     return last_search_nodes.load(std::memory_order_relaxed);
+}
+
+void wait_for_search() {
+    if (controller_thread.joinable()) {
+        controller_thread.join();
+    }
 }
 
 void stop_and_join() {

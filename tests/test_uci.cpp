@@ -24,17 +24,22 @@ protected:
 TEST_F(UCITest, Handshake) {
     UCI uci;
 
-    testing::internal::CaptureStdout();
+    std::stringstream buffer;
+    std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
     bool keep_running = uci.execute_line("uci");
-    std::string output = testing::internal::GetCapturedStdout();
+    std::cout.rdbuf(old);
+    std::string output = buffer.str();
 
     EXPECT_TRUE(keep_running);
     EXPECT_TRUE(output.find("uciok") != std::string::npos);
     EXPECT_TRUE(output.find("id name") != std::string::npos);
 
-    testing::internal::CaptureStdout();
+    buffer.str("");
+    buffer.clear();
+    std::cout.rdbuf(buffer.rdbuf());
     keep_running = uci.execute_line("isready");
-    output = testing::internal::GetCapturedStdout();
+    std::cout.rdbuf(old);
+    output = buffer.str();
 
     EXPECT_TRUE(keep_running);
     EXPECT_TRUE(output.find("readyok") != std::string::npos);
@@ -51,6 +56,8 @@ TEST_F(UCITest, SetOption) {
     // Change Threads count
     uci.execute_line("setoption name Threads value 4");
     EXPECT_EQ(Search::num_threads, 4);
+    uci.execute_line("setoption name Threads value 1");
+    EXPECT_EQ(Search::num_threads, 1);
 
     // Change SyzygyPath
     uci.execute_line("setoption name SyzygyPath value dummy_path");
@@ -76,12 +83,10 @@ TEST_F(UCITest, PositionExecution) {
 // 5. Verify benchmark execution flow at depth 1
 TEST_F(UCITest, BenchmarkExecution) {
     UCI uci;
-    
-    // Divert stdout to capture benchmark results
-    testing::internal::CaptureStdout();
+    std::stringstream buffer;
+    std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
     bool keep_running = uci.execute_line("bench 1");
-    std::string output = testing::internal::GetCapturedStdout();
-
+    std::cout.rdbuf(old);
     EXPECT_TRUE(keep_running);
-    EXPECT_TRUE(output.find("Total Nodes") != std::string::npos || output.find("Total Nodes:") != std::string::npos);
+    EXPECT_TRUE(buffer.str().find("Total Nodes") != std::string::npos);
 }
