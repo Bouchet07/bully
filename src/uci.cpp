@@ -1006,10 +1006,10 @@ void UCI::run_benchmark(int depth) {
 
         if (is_interactive()) {
             std::cout << std::format("  {:>2}  | {:<55} | {}{:<10.0f}{}\n", 
-                                     num++, fen_display, style.magenta, nps, style.reset);
+                                     num++, fen_display, style.magenta, nps, style.reset) << std::flush;
         } else {
             std::cout << std::format("Position {:>2} : FEN: {} | Nodes: {} | Time: {} ms | NPS: {:.0f}\n", 
-                                     num++, fen, nodes, duration_ms, nps);
+                                     num++, fen, nodes, duration_ms, nps) << std::flush;
         }
     }
 

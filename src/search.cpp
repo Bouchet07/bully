@@ -60,12 +60,14 @@ struct SearchInitializer {
 struct Heuristics {
     std::array<Move, MAX_PLY> killer1 = {Move::none()};
     std::array<Move, MAX_PLY> killer2 = {Move::none()};
+    std::array<std::array<Move, 64>, 64> countermoves = {};
     // [PieceType][ToSquare]
     std::array<std::array<int, 64>, 16> history = {{{0}}};
 
     void clear() {
         killer1.fill(Move::none());
         killer2.fill(Move::none());
+        for (auto& row : countermoves) row.fill(Move::none());
         for (auto& row : history) row.fill(0);
     }
 };
@@ -116,14 +118,14 @@ void SearchState::check_limits() {
     }
 }
 
-static int score_move(Move m, Move tt_move, const Position& pos, int ply, const Heuristics& heuristics) {
+static int score_move(Move m, Move tt_move, Move prev_move, const Position& pos, int ply, const Heuristics& heuristics) {
     if (m == tt_move) return 1000000;
 
     bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
     if (is_cap) {
         Value see_val = pos.see(m);
         if (see_val < 0) {
-            return 10000 + see_val; // Sort below killers and history, but above completely garbage/illegal moves
+            return 10000 + see_val; // Sort below killers and history
         }
         Piece victim = (m.type_of() == EN_PASSANT) ? make_piece(~pos.side_to_move(), PAWN) : pos.piece_on(m.to_sq());
         Piece attacker = pos.piece_on(m.from_sq());
@@ -133,6 +135,7 @@ static int score_move(Move m, Move tt_move, const Position& pos, int ply, const 
     if (use_killers) {
         if (m == heuristics.killer1[static_cast<size_t>(ply)]) return 80000;
         if (m == heuristics.killer2[static_cast<size_t>(ply)]) return 70000;
+        if (prev_move.is_ok() && m == heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())]) return 65000;
     }
 
     if (use_history) {
@@ -178,7 +181,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     }
 
     for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, Move::none(), pos, ply, heuristics);
+        list[i].value = score_move(list[i].move, Move::none(), Move::none(), pos, ply, heuristics);
     }
 
     int legal_moves = 0;
@@ -224,7 +227,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     return alpha;
 }
 
-static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics) {
+static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics, Move prev_move = Move::none()) {
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
     }
@@ -307,7 +310,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     list.generate(pos);
 
     for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, tt_move, pos, ply, heuristics);
+        list[i].value = score_move(list[i].move, tt_move, prev_move, pos, ply, heuristics);
     }
 
     int legal_moves = 0;
@@ -382,14 +385,14 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 reduction = std::clamp(reduction, 0, depth - 1);
             }
 
-            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction + extension, ply + 1, ss, heuristics);
+            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction + extension, ply + 1, ss, heuristics, m);
 
             if (score > alpha && reduction > 0) {
-                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
+                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m);
             }
 
             if (score > alpha && score < beta) {
-                score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
+                score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m);
             }
         }
 
@@ -430,6 +433,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                     if (heuristics.killer1[p_idx] != m) {
                         heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
                         heuristics.killer1[p_idx] = m;
+                    }
+                    if (prev_move.is_ok()) {
+                        heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())] = m;
                     }
                 }
                 if (use_history) {
