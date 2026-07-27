@@ -38,18 +38,32 @@ void UCI::init() {
 }
 
 uint64_t UCI::run_perft(int depth) {
-    if (depth == 0) return 1ULL;
+    if (depth <= 0) return 1ULL;
+
+    MoveList list;
+    list.generate_legal(pos);
+
+    if (depth == 1) return list.size();
 
     uint64_t nodes = 0;
-    MoveList list;
-    list.generate(pos);
+    if (depth == 2) {
+        for (size_t i = 0; i < list.size(); ++i) {
+            Move m = list[i].move;
+            StateInfo next_si;
+            pos.make_move(m, next_si);
+            MoveList sub_list;
+            sub_list.generate_legal(pos);
+            nodes += sub_list.size();
+            pos.unmake_move(m);
+        }
+        return nodes;
+    }
 
     for (size_t i = 0; i < list.size(); ++i) {
         Move m = list[i].move;
         StateInfo next_si;
-        if (pos.make_move(m, next_si)) {
-            nodes += run_perft(depth - 1);
-        }
+        pos.make_move(m, next_si);
+        nodes += run_perft(depth - 1);
         pos.unmake_move(m);
     }
     return nodes;
@@ -893,25 +907,24 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
     }
 
     MoveList list;
-    list.generate(pos);
+    list.generate_legal(pos);
     uint64_t total = 0;
 
     for (size_t i = 0; i < list.size(); ++i) {
         Move m = list[i].move;
         StateInfo next_si;
-        if (pos.make_move(m, next_si)) {
-            uint64_t subnodes = run_perft(depth - 1);
-            if (is_go_cmd) {
-                std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
+        pos.make_move(m, next_si);
+        uint64_t subnodes = run_perft(depth - 1);
+        if (is_go_cmd) {
+            std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
+        } else {
+            if (is_interactive()) {
+                std::cout << std::format("  {}{}{}: {}{}{}\n", style.yellow, m.to_string(), style.reset, style.magenta, subnodes, style.reset);
             } else {
-                if (is_interactive()) {
-                    std::cout << std::format("  {}{}{}: {}{}{}\n", style.yellow, m.to_string(), style.reset, style.magenta, subnodes, style.reset);
-                } else {
-                    std::cout << std::format("  {}: {}\n", m.to_string(), subnodes);
-                }
+                std::cout << std::format("  {}: {}\n", m.to_string(), subnodes);
             }
-            total += subnodes;
         }
+        total += subnodes;
         pos.unmake_move(m);
     }
 

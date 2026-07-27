@@ -44,8 +44,23 @@ public:
     // Check if the side to move's king is in check
     [[nodiscard]] bool in_check() const;
 
+    // Fast check if a pseudo-legal move is strictly legal without mutating board state
+    [[nodiscard]] bool legal(Move m) const;
+
+    // Get bitboard of pieces pinning enemy/friendly pieces to the king
+    [[nodiscard]] Bitboard blockers_for_king(Color c) const;
+
+    // Get bitboard of pieces checking a given king
+    [[nodiscard]] Bitboard checkers() const;
+    [[nodiscard]] Bitboard checkers(Color c) const;
+
+    // Get bitboard of all attackers to a square by a given color
+    [[nodiscard]] Bitboard attackers_to(Square sq, Color c) const;
+    [[nodiscard]] Bitboard attackers_to(Square sq, Color c, Bitboard occ) const;
+
     // Check if a square is attacked by pieces of a given color
     [[nodiscard]] bool attacked(Square sq, Color attacked_by) const;
+    [[nodiscard]] bool attacked(Square sq, Color attacked_by, Bitboard occ) const;
 
     // Make a move. Returns false if the move was illegal (leaves King in check)
     bool make_move(Move m, StateInfo& new_state);

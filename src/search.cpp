@@ -202,7 +202,6 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 
         StateInfo next_si;
         if (!pos.make_move(m, next_si)) {
-            pos.unmake_move(m);
             continue;
         }
         legal_moves++;
@@ -355,7 +354,6 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
         StateInfo next_si;
         if (!pos.make_move(m, next_si)) {
-            pos.unmake_move(m);
             continue;
         }
 
@@ -622,7 +620,6 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 Move m = root_moves[i].move;
                 StateInfo si;
                 if (!main_worker->pos.make_move(m, si)) {
-                    main_worker->pos.unmake_move(m);
                     continue;
                 }
                 main_worker->ss.nodes++;

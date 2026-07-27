@@ -24,6 +24,9 @@ public:
     // Generate all pseudo-legal moves for a position
     void generate(const Position& pos);
 
+    // Generate all strictly legal moves for a position
+    void generate_legal(const Position& pos);
+
     // Generate only pseudo-legal captures (used for Quiescence Search)
     void generate_captures(const Position& pos);
 

@@ -11,7 +11,20 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
     const Bitboard friendly_pieces = pos.pieces(Us);
     const Bitboard enemy_pieces    = pos.pieces(Them);
     const Bitboard occupied_squares = pos.occupied();
-    const Bitboard target_squares   = CapturesOnly ? enemy_pieces : ~friendly_pieces;
+
+    Bitboard check_mask = ~0ULL;
+    Bitboard chk = pos.checkers(Us);
+    if (chk) {
+        if (more_than_one(chk)) {
+            check_mask = 0ULL; // Double check requires King move
+        } else {
+            Square checker_sq = lsb(chk);
+            Square ksq = pos.king_square(Us);
+            check_mask = square_bb(checker_sq) | (BetweenBB[to_index(ksq)][to_index(checker_sq)] ^ square_bb(checker_sq));
+        }
+    }
+
+    const Bitboard target_squares   = (CapturesOnly ? enemy_pieces : ~friendly_pieces) & check_mask;
 
     // ------------------------------------------------------------------------
     // 1. Pawn Moves
@@ -28,8 +41,8 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
 
     if constexpr (!CapturesOnly) {
         Bitboard single_pushes = shift<Up>(pawns) & empty_squares;
-        Bitboard promo_pushes = single_pushes & rank_bb(promo_rank);
-        Bitboard quiet_pushes = single_pushes & ~rank_bb(promo_rank);
+        Bitboard promo_pushes = single_pushes & rank_bb(promo_rank) & check_mask;
+        Bitboard quiet_pushes = single_pushes & ~rank_bb(promo_rank) & check_mask;
 
         while (quiet_pushes) {
             Square to = lsb(quiet_pushes);
@@ -49,7 +62,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
         }
 
         constexpr Rank double_push_rank = (Us == WHITE) ? RANK_3 : RANK_6;
-        Bitboard double_pushes = shift<Up>(single_pushes & rank_bb(double_push_rank)) & empty_squares;
+        Bitboard double_pushes = shift<Up>(single_pushes & rank_bb(double_push_rank)) & empty_squares & check_mask;
 
         while (double_pushes) {
             Square to = lsb(double_pushes);
@@ -59,8 +72,8 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
         }
     }
 
-    Bitboard cap_left  = shift<UpWest>(pawns) & enemy_pieces;
-    Bitboard cap_right = shift<UpEast>(pawns) & enemy_pieces;
+    Bitboard cap_left  = shift<UpWest>(pawns) & enemy_pieces & check_mask;
+    Bitboard cap_right = shift<UpEast>(pawns) & enemy_pieces & check_mask;
 
     Bitboard promo_left = cap_left & rank_bb(promo_rank);
     Bitboard quiet_left = cap_left & ~rank_bb(promo_rank);
@@ -161,7 +174,8 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
     // 5. King Moves & Castling
     // ------------------------------------------------------------------------
     Square king_from = pos.king_square(Us);
-    Bitboard king_targets = king_attacks(king_from) & target_squares;
+    Bitboard king_target_squares = CapturesOnly ? enemy_pieces : ~friendly_pieces;
+    Bitboard king_targets = king_attacks(king_from) & king_target_squares;
     while (king_targets) {
         Square to = lsb(king_targets);
         king_targets &= king_targets - 1;
@@ -212,6 +226,18 @@ void MoveList::generate(const Position& pos) {
         last = generate_all<WHITE, false>(pos, list.data());
     } else {
         last = generate_all<BLACK, false>(pos, list.data());
+    }
+}
+
+void MoveList::generate_legal(const Position& pos) {
+    generate(pos);
+    ExtMove* cur = list.data();
+    ExtMove* end = last;
+    last = list.data();
+    for (ExtMove* p = cur; p < end; ++p) {
+        if (pos.legal(p->move)) {
+            *last++ = *p;
+        }
     }
 }
 

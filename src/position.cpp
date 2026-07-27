@@ -252,15 +252,100 @@ std::string Position::get_fen() const {
 }
 
 bool Position::attacked(Square sq, Color attacked_by) const {
+    return attacked(sq, attacked_by, occupied());
+}
+
+bool Position::attacked(Square sq, Color attacked_by, Bitboard occ) const {
     if (pawn_attacks(~attacked_by, sq) & pieces(attacked_by, PAWN)) return true;
     if (knight_attacks(sq) & pieces(attacked_by, KNIGHT)) return true;
     if (king_attacks(sq) & pieces(attacked_by, KING)) return true;
 
-    Bitboard occ = occupied();
     if (rook_attacks(sq, occ) & (pieces(attacked_by, ROOK) | pieces(attacked_by, QUEEN))) return true;
     if (bishop_attacks(sq, occ) & (pieces(attacked_by, BISHOP) | pieces(attacked_by, QUEEN))) return true;
 
     return false;
+}
+
+Bitboard Position::attackers_to(Square sq, Color c) const {
+    return attackers_to(sq, c, occupied());
+}
+
+Bitboard Position::attackers_to(Square sq, Color c, Bitboard occ) const {
+    return (pawn_attacks(~c, sq) & pieces(c, PAWN))
+         | (knight_attacks(sq) & pieces(c, KNIGHT))
+         | (king_attacks(sq) & pieces(c, KING))
+         | (rook_attacks(sq, occ) & (pieces(c, ROOK) | pieces(c, QUEEN)))
+         | (bishop_attacks(sq, occ) & (pieces(c, BISHOP) | pieces(c, QUEEN)));
+}
+
+Bitboard Position::checkers() const {
+    return checkers(side_to_move_color);
+}
+
+Bitboard Position::checkers(Color c) const {
+    Square ksq = king_square(c);
+    if (ksq == SQ_NONE) return 0ULL;
+    return attackers_to(ksq, ~c, occupied());
+}
+
+Bitboard Position::blockers_for_king(Color c) const {
+    Square ksq = king_square(c);
+    if (ksq == SQ_NONE) return 0ULL;
+    Color them = ~c;
+
+    Bitboard blockers = 0ULL;
+    Bitboard snipers = ((rook_attacks(ksq, 0ULL) & (pieces(them, ROOK) | pieces(them, QUEEN)))
+                     | (bishop_attacks(ksq, 0ULL) & (pieces(them, BISHOP) | pieces(them, QUEEN))));
+
+    Bitboard occ = occupied() ^ snipers;
+    while (snipers) {
+        Square sniper_sq = lsb(snipers);
+        snipers &= snipers - 1;
+        Bitboard b = (BetweenBB[to_index(ksq)][to_index(sniper_sq)] ^ square_bb(sniper_sq)) & occ;
+        if (b && !more_than_one(b)) {
+            blockers |= b;
+        }
+    }
+    return blockers;
+}
+
+bool Position::legal(Move m) const {
+    Color us = side_to_move_color;
+    Square from = m.from_sq();
+    Square to = m.to_sq();
+    MoveType type = m.type_of();
+
+    if (type == EN_PASSANT) {
+        Square ksq = king_square(us);
+        Square cap_sq = to - pawn_push(us);
+        Bitboard occ = (occupied() ^ square_bb(from) ^ square_bb(cap_sq)) | square_bb(to);
+        return !attacked(ksq, ~us, occ);
+    }
+
+    if (type == CASTLING) {
+        if (in_check()) return false;
+        if (to == SQ_G1) return !attacked(SQ_F1, BLACK) && !attacked(SQ_G1, BLACK);
+        if (to == SQ_C1) return !attacked(SQ_C1, BLACK) && !attacked(SQ_D1, BLACK);
+        if (to == SQ_G8) return !attacked(SQ_F8, WHITE) && !attacked(SQ_G8, WHITE);
+        if (to == SQ_C8) return !attacked(SQ_C8, WHITE) && !attacked(SQ_D8, WHITE);
+        return true;
+    }
+
+    Square ksq = king_square(us);
+    if (type_of(board[to_index(from)]) == KING) {
+        return !attacked(to, ~us, occupied() ^ square_bb(from));
+    }
+
+    Bitboard chk = checkers(us);
+    if (chk) {
+        if (more_than_one(chk)) return false;
+        Square checker_sq = lsb(chk);
+        Bitboard target_mask = square_bb(checker_sq) | (BetweenBB[to_index(ksq)][to_index(checker_sq)] ^ square_bb(checker_sq));
+        if (!(square_bb(to) & target_mask)) return false;
+    }
+
+    Bitboard pinned = blockers_for_king(us);
+    return !(pinned & square_bb(from)) || aligned(from, to, ksq);
 }
 
 bool Position::in_check() const {
@@ -268,6 +353,10 @@ bool Position::in_check() const {
 }
 
 bool Position::make_move(Move m, StateInfo& new_state) {
+    if (!legal(m)) {
+        return false;
+    }
+
     new_state = *st;
     new_state.previous = st;
     new_state.captured_piece = NO_PIECE;
@@ -280,7 +369,6 @@ bool Position::make_move(Move m, StateInfo& new_state) {
     Piece pc = board[to_index(from)];
     PieceType pt = type_of(pc);
     Color us = side_to_move_color;
-    Color them = ~us;
 
     new_state.key ^= CastlingKeys[to_index(st->castling_rights)];
     if (st->en_passant_square != SQ_NONE) {
@@ -358,10 +446,6 @@ bool Position::make_move(Move m, StateInfo& new_state) {
     side_to_move_color = ~side_to_move_color;
     st = &new_state;
 
-    if (attacked(king_square(us), them)) {
-        return false;
-    }
-
     return true;
 }
 
@@ -372,7 +456,6 @@ void Position::unmake_move(Move m) {
     Square to = m.to_sq();
     MoveType type = m.type_of();
     Color us = side_to_move_color;
-    Piece pc = board[to_index(to)];
 
     if (type == PROMOTION) {
         remove_piece(to);
