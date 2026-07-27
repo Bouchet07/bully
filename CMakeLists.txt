@@ -25,6 +25,7 @@ set(ENGINE_SOURCES
     src/tt.cpp
     src/search.cpp
     src/evaluation.cpp
+    src/nnue.cpp
     src/uci.cpp
     src/syzygy.cpp
     src/cli.cpp
@@ -40,6 +41,7 @@ set(ENGINE_HEADERS
     src/tt.h
     src/search.h
     src/evaluation.h
+    src/nnue.h
     src/uci.h
     src/syzygy.h
     src/cli.h
@@ -86,6 +88,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(BULLY_ARCH STREQUAL "native")
             list(APPEND ARCH_FLAGS -march=native)
             set(BINARY_SUFFIX "-native")
+        elseif(BULLY_ARCH STREQUAL "avx512")
+            list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl)
+            set(BINARY_SUFFIX "-avx512")
         elseif(BULLY_ARCH STREQUAL "bmi2")
             list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
             set(BINARY_SUFFIX "-bmi2")

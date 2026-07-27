@@ -14,6 +14,7 @@
 #include "tt.h"
 #include "search.h"
 #include "evaluation.h"
+#include "nnue.h"
 #include "syzygy.h"
 
 namespace Bully {
@@ -25,6 +26,7 @@ void UCI::init() {
     // Initialize starting position, TT, and Syzygy tablebases
     TT.resize(16);
     Syzygy::init("syzygy");
+    NNUE::init();
     history.emplace_back();
     pos.set_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", history.back());
 
@@ -174,6 +176,32 @@ bool UCI::execute_line(const std::string& line) {
                         Search::multipv_count = std::max(1, val);
                         if (is_interactive()) {
                             std::cout << std::format("MultiPV count set to {}.\n", Search::multipv_count);
+                        }
+                    }
+                }
+                else if (option_name == "UseNNUE") {
+                    std::string value_keyword;
+                    is >> value_keyword;
+                    std::string val;
+                    if (is >> val) {
+                        NNUE::use_nnue = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("UseNNUE set to {}.\n", NNUE::use_nnue);
+                        }
+                    }
+                }
+                else if (option_name == "EvalFile") {
+                    std::string value_keyword;
+                    is >> value_keyword;
+                    std::string val;
+                    if (is >> val) {
+                        bool loaded = NNUE::load_net(val);
+                        if (is_interactive()) {
+                            if (loaded) {
+                                std::cout << std::format("EvalFile loaded from '{}'.\n", val);
+                            } else {
+                                std::cout << std::format("Failed to load EvalFile from '{}'.\n", val);
+                            }
                         }
                     }
                 }
