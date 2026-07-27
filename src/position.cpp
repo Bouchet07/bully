@@ -5,7 +5,6 @@
 #include <format>
 #include <algorithm>
 #include "position.h"
-#include "evaluation.h"
 
 namespace Bully {
 
@@ -43,8 +42,6 @@ void init_zobrist() {
     CastlingRightsMask[to_index(SQ_A8)] = static_cast<CastlingRights>(ANY_CASTLING & ~BLACK_OOO);
     CastlingRightsMask[to_index(SQ_H8)] = static_cast<CastlingRights>(ANY_CASTLING & ~BLACK_OO);
     CastlingRightsMask[to_index(SQ_E8)] = static_cast<CastlingRights>(ANY_CASTLING & ~(BLACK_OO | BLACK_OOO));
-
-    Eval::init_eval();
 }
 
 void Position::add_piece(Piece pc, Square sq) {
@@ -186,19 +183,6 @@ void Position::set_fen(const std::string& fen, StateInfo& si) {
     st->previous = nullptr;
     st->captured_piece = NO_PIECE;
     st->key = compute_key();
-
-    st->psq_mg = 0;
-    st->psq_eg = 0;
-    st->game_phase = 0;
-    for (size_t s = 0; s < 64; ++s) {
-        Square sq = static_cast<Square>(s);
-        Piece pc = board[s];
-        if (pc != NO_PIECE) {
-            st->psq_mg = static_cast<int16_t>(st->psq_mg + Eval::PST_MG[to_index(pc)][to_index(sq)]);
-            st->psq_eg = static_cast<int16_t>(st->psq_eg + Eval::PST_EG[to_index(pc)][to_index(sq)]);
-            st->game_phase = static_cast<int16_t>(st->game_phase + Eval::PhaseWeight[to_index(pc)]);
-        }
-    }
 }
 
 std::string Position::get_fen() const {
@@ -406,10 +390,6 @@ bool Position::make_move(Move m, StateInfo& new_state) {
         remove_piece(cap_sq);
         
         new_state.rule50 = 0;
-
-        new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg - Eval::PST_MG[to_index(captured)][to_index(cap_sq)]);
-        new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg - Eval::PST_EG[to_index(captured)][to_index(cap_sq)]);
-        new_state.game_phase = static_cast<int16_t>(new_state.game_phase - Eval::PhaseWeight[to_index(captured)]);
     } else if (captured != NO_PIECE) {
         new_state.captured_piece = captured;
         
@@ -417,18 +397,11 @@ bool Position::make_move(Move m, StateInfo& new_state) {
         remove_piece(to);
         
         new_state.rule50 = 0;
-
-        new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg - Eval::PST_MG[to_index(captured)][to_index(to)]);
-        new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg - Eval::PST_EG[to_index(captured)][to_index(to)]);
-        new_state.game_phase = static_cast<int16_t>(new_state.game_phase - Eval::PhaseWeight[to_index(captured)]);
     }
 
     if (type == NORMAL) {
         move_piece_internal(from, to);
         new_state.key ^= PieceKeys[to_index(pc)][to_index(from)] ^ PieceKeys[to_index(pc)][to_index(to)];
-
-        new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg + Eval::PST_MG[to_index(pc)][to_index(to)] - Eval::PST_MG[to_index(pc)][to_index(from)]);
-        new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg + Eval::PST_EG[to_index(pc)][to_index(to)] - Eval::PST_EG[to_index(pc)][to_index(from)]);
 
         if (pt == PAWN && std::abs(std::to_underlying(to) - std::to_underlying(from)) == 16) {
             new_state.en_passant_square = static_cast<Square>((std::to_underlying(from) + std::to_underlying(to)) / 2);
@@ -443,16 +416,9 @@ bool Position::make_move(Move m, StateInfo& new_state) {
             Piece promo_pc = make_piece(us, promo_pt);
             add_piece(promo_pc, to);
             new_state.key ^= PieceKeys[to_index(promo_pc)][to_index(to)];
-
-            new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg + Eval::PST_MG[to_index(promo_pc)][to_index(to)] - Eval::PST_MG[to_index(pc)][to_index(from)]);
-            new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg + Eval::PST_EG[to_index(promo_pc)][to_index(to)] - Eval::PST_EG[to_index(pc)][to_index(from)]);
-            new_state.game_phase = static_cast<int16_t>(new_state.game_phase + Eval::PhaseWeight[to_index(promo_pc)]);
         } else if (type == EN_PASSANT) {
             add_piece(pc, to);
             new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
-
-            new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg + Eval::PST_MG[to_index(pc)][to_index(to)] - Eval::PST_MG[to_index(pc)][to_index(from)]);
-            new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg + Eval::PST_EG[to_index(pc)][to_index(to)] - Eval::PST_EG[to_index(pc)][to_index(from)]);
         } else if (type == CASTLING) {
             Square r_from = SQ_NONE;
             Square r_to = SQ_NONE;
@@ -469,11 +435,6 @@ bool Position::make_move(Move m, StateInfo& new_state) {
 
             add_piece(pc, to);
             new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
-
-            new_state.psq_mg = static_cast<int16_t>(new_state.psq_mg + Eval::PST_MG[to_index(pc)][to_index(to)] - Eval::PST_MG[to_index(pc)][to_index(from)]
-                                                      + Eval::PST_MG[to_index(rook)][to_index(r_to)] - Eval::PST_MG[to_index(rook)][to_index(r_from)]);
-            new_state.psq_eg = static_cast<int16_t>(new_state.psq_eg + Eval::PST_EG[to_index(pc)][to_index(to)] - Eval::PST_EG[to_index(pc)][to_index(from)]
-                                                      + Eval::PST_EG[to_index(rook)][to_index(r_to)] - Eval::PST_EG[to_index(rook)][to_index(r_from)]);
         }
     }
 

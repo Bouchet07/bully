@@ -135,61 +135,28 @@ constexpr std::array<Bitboard, 64> FrontSpansBlack = []() {
     return arr;
 }();
 
-std::array<std::array<int, 64>, PIECE_NB> PST_MG{};
-std::array<std::array<int, 64>, PIECE_NB> PST_EG{};
-std::array<int, PIECE_NB>                 PhaseWeight{};
+// Compute the game phase (24 = full middlegame, 0 = pure endgame)
+[[nodiscard]] static int calculate_phase(const Position& pos) {
+    int phase = 24;
+    
+    int knights = popcnt(pos.pieces(KNIGHT));
+    int bishops = popcnt(pos.pieces(BISHOP));
+    int rooks   = popcnt(pos.pieces(ROOK));
+    int queens  = popcnt(pos.pieces(QUEEN));
 
-void init_eval() {
-    PhaseWeight.fill(0);
-    PhaseWeight[to_index(W_KNIGHT)] = 1;
-    PhaseWeight[to_index(B_KNIGHT)] = 1;
-    PhaseWeight[to_index(W_BISHOP)] = 1;
-    PhaseWeight[to_index(B_BISHOP)] = 1;
-    PhaseWeight[to_index(W_ROOK)]   = 2;
-    PhaseWeight[to_index(B_ROOK)]   = 2;
-    PhaseWeight[to_index(W_QUEEN)]  = 4;
-    PhaseWeight[to_index(B_QUEEN)]  = 4;
+    phase -= (4 - knights) * 1;
+    phase -= (4 - bishops) * 1;
+    phase -= (4 - rooks) * 2;
+    phase -= (2 - queens) * 4;
 
-    for (size_t p = 0; p < PIECE_NB; ++p) {
-        PST_MG[p].fill(0);
-        PST_EG[p].fill(0);
-    }
-
-    auto set_pst = [](Piece pc, int val, const std::array<int, 64>& pst_mg, const std::array<int, 64>& pst_eg) {
-        Color c = color_of(pc);
-        size_t p_idx = to_index(pc);
-        for (int s = 0; s < 64; ++s) {
-            Square sq = static_cast<Square>(s);
-            Square rel_sq = relative_square(c, sq);
-            size_t idx = to_index(rel_sq);
-            int mg = val + pst_mg[idx];
-            int eg = val + pst_eg[idx];
-            PST_MG[p_idx][to_index(sq)] = (c == WHITE) ? mg : -mg;
-            PST_EG[p_idx][to_index(sq)] = (c == WHITE) ? eg : -eg;
-        }
-    };
-
-    set_pst(W_PAWN, PawnValue, PawnPST, PawnPST);
-    set_pst(B_PAWN, PawnValue, PawnPST, PawnPST);
-
-    set_pst(W_KNIGHT, KnightValue, KnightPST, KnightPST);
-    set_pst(B_KNIGHT, KnightValue, KnightPST, KnightPST);
-
-    set_pst(W_BISHOP, BishopValue, BishopPST, BishopPST);
-    set_pst(B_BISHOP, BishopValue, BishopPST, BishopPST);
-
-    set_pst(W_ROOK, RookValue, RookPST, RookPST);
-    set_pst(B_ROOK, RookValue, RookPST, RookPST);
-
-    set_pst(W_QUEEN, QueenValue, QueenPST, QueenPST);
-    set_pst(B_QUEEN, QueenValue, QueenPST, QueenPST);
-
-    set_pst(W_KING, 0, KingMiddlegamePST, KingEndgamePST);
-    set_pst(B_KING, 0, KingMiddlegamePST, KingEndgamePST);
+    if (phase < 0)  phase = 0;
+    if (phase > 24) phase = 24;
+    
+    return phase;
 }
 
 template<Color Us>
-[[nodiscard]] static std::pair<Value, Value> evaluate_pawn_structure(const Position& pos) {
+[[nodiscard]] static std::pair<Value, Value> evaluate_pawns(const Position& pos) {
     constexpr Color Them = ~Us;
     const Bitboard our_pawns = pos.pieces(Us, PAWN);
     const Bitboard opponent_pawns = pos.pieces(Them, PAWN);
@@ -202,8 +169,11 @@ template<Color Us>
         Square sq = lsb(pawns);
         pawns &= pawns - 1;
         
-        int p_mg = 0;
-        int p_eg = 0;
+        Square rel_sq = relative_square(Us, sq);
+        size_t idx = to_index(rel_sq);
+        
+        int p_mg = PawnPST[idx];
+        int p_eg = PawnPST[idx];
         
         File f = file_of(sq);
         Bitboard adjacent = AdjacentFiles[to_index(f)];
@@ -230,53 +200,115 @@ template<Color Us>
             p_eg += 20 * rel_rank;
         }
         
-        mg = static_cast<Value>(mg + p_mg);
-        eg = static_cast<Value>(eg + p_eg);
+        mg = static_cast<Value>(mg + PawnValue + p_mg);
+        eg = static_cast<Value>(eg + PawnValue + p_eg);
+    }
+    
+    return { mg, eg };
+}
+
+template<Color Us>
+[[nodiscard]] static std::pair<Value, Value> evaluate_pieces(const Position& pos) {
+    Value mg = 0;
+    Value eg = 0;
+    
+    Bitboard knights = pos.pieces(Us, KNIGHT);
+    while (knights) {
+        Square sq = lsb(knights);
+        knights &= knights - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + KnightValue + KnightPST[idx]);
+        eg = static_cast<Value>(eg + KnightValue + KnightPST[idx]);
+    }
+    
+    Bitboard bishops = pos.pieces(Us, BISHOP);
+    while (bishops) {
+        Square sq = lsb(bishops);
+        bishops &= bishops - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + BishopValue + BishopPST[idx]);
+        eg = static_cast<Value>(eg + BishopValue + BishopPST[idx]);
+    }
+    
+    Bitboard rooks = pos.pieces(Us, ROOK);
+    while (rooks) {
+        Square sq = lsb(rooks);
+        rooks &= rooks - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + RookValue + RookPST[idx]);
+        eg = static_cast<Value>(eg + RookValue + RookPST[idx]);
+    }
+    
+    Bitboard queens = pos.pieces(Us, QUEEN);
+    while (queens) {
+        Square sq = lsb(queens);
+        queens &= queens - 1;
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + QueenValue + QueenPST[idx]);
+        eg = static_cast<Value>(eg + QueenValue + QueenPST[idx]);
+    }
+    
+    Bitboard king = pos.pieces(Us, KING);
+    if (king) {
+        Square sq = get_LSB(king);
+        size_t idx = to_index(relative_square(Us, sq));
+        mg = static_cast<Value>(mg + KingMiddlegamePST[idx]);
+        eg = static_cast<Value>(eg + KingEndgamePST[idx]);
+    }
+    
+    // Bishop pair bonus
+    int bishop_count = popcnt(pos.pieces(Us, BISHOP));
+    if (bishop_count >= 2) {
+        mg = static_cast<Value>(mg + 30);
+        eg = static_cast<Value>(eg + 40);
     }
     
     return { mg, eg };
 }
 
 Value evaluate(const Position& pos) {
-    const StateInfo* st = pos.state();
-    int mg = st->psq_mg;
-    int eg = st->psq_eg;
-    int phase = std::clamp(static_cast<int>(st->game_phase), 0, 24);
-
-    auto [white_pawn_mg, white_pawn_eg] = evaluate_pawn_structure<WHITE>(pos);
-    auto [black_pawn_mg, black_pawn_eg] = evaluate_pawn_structure<BLACK>(pos);
-
-    mg += white_pawn_mg - black_pawn_mg;
-    eg += white_pawn_eg - black_pawn_eg;
-
-    int white_bishops = popcnt(pos.pieces(WHITE, BISHOP));
-    int black_bishops = popcnt(pos.pieces(BLACK, BISHOP));
-    if (white_bishops >= 2) { mg += 30; eg += 40; }
-    if (black_bishops >= 2) { mg -= 30; eg -= 40; }
-
-    int score = (mg * phase + eg * (24 - phase)) / 24;
-    return (pos.side_to_move() == WHITE) ? static_cast<Value>(score) : static_cast<Value>(-score);
+    auto [mg_white_pawns, eg_white_pawns] = evaluate_pawns<WHITE>(pos);
+    auto [mg_white_pieces, eg_white_pieces] = evaluate_pieces<WHITE>(pos);
+    
+    auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
+    auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
+    
+    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
+    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    
+    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
+    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    
+    int phase = calculate_phase(pos);
+    
+    Value mg_score = static_cast<Value>(mg_white - mg_black);
+    Value eg_score = static_cast<Value>(eg_white - eg_black);
+    
+    Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
+    
+    return (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
 }
 
 void print_detailed_eval(const Position& pos, bool use_color) {
-    const StateInfo* st = pos.state();
-    int mg_base = st->psq_mg;
-    int eg_base = st->psq_eg;
-
-    auto [mg_white_pawns, eg_white_pawns] = evaluate_pawn_structure<WHITE>(pos);
-    auto [mg_black_pawns, eg_black_pawns] = evaluate_pawn_structure<BLACK>(pos);
-
-    int mg_score = mg_base + mg_white_pawns - mg_black_pawns;
-    int eg_score = eg_base + eg_white_pawns - eg_black_pawns;
-
-    int white_bishops = popcnt(pos.pieces(WHITE, BISHOP));
-    int black_bishops = popcnt(pos.pieces(BLACK, BISHOP));
-    if (white_bishops >= 2) { mg_score += 30; eg_score += 40; }
-    if (black_bishops >= 2) { mg_score -= 30; eg_score -= 40; }
-
-    int phase = std::clamp(static_cast<int>(st->game_phase), 0, 24);
-    int score = (mg_score * phase + eg_score * (24 - phase)) / 24;
-    int relative_score = (pos.side_to_move() == WHITE) ? score : -score;
+    auto [mg_white_pawns, eg_white_pawns] = evaluate_pawns<WHITE>(pos);
+    auto [mg_white_pieces, eg_white_pieces] = evaluate_pieces<WHITE>(pos);
+    
+    auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
+    auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
+    
+    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
+    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    
+    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
+    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    
+    int phase = calculate_phase(pos);
+    
+    Value mg_score = static_cast<Value>(mg_white - mg_black);
+    Value eg_score = static_cast<Value>(eg_white - eg_black);
+    
+    Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
+    Value relative_score = (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
 
     std::string reset   = use_color ? "\033[0m" : "";
     std::string yellow  = use_color ? "\033[1;33m" : "";
@@ -289,6 +321,16 @@ void print_detailed_eval(const Position& pos, bool use_color) {
     std::cout << blue << "========================================================\n" << reset;
     std::cout << std::format("  {}Phase{} : {}{} (24 = Middlegame, 0 = Endgame)\n", 
                  green, reset, magenta, phase, reset);
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << "  Category           |  White (MG/EG)  |  Black (MG/EG)   \n";
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << std::format("  Pawns & PST        |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white_pawns, eg_white_pawns, mg_black_pawns, eg_black_pawns);
+    std::cout << std::format("  Pieces & PST       |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white_pieces, eg_white_pieces, mg_black_pieces, eg_black_pieces);
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    std::cout << std::format("  Total Term         |   {:4} / {:4}   |   {:4} / {:4}   \n", 
+                 mg_white, eg_white, mg_black, eg_black);
     std::cout << blue << "--------------------------------------------------------\n" << reset;
     std::cout << std::format("  {}Middlegame Score{}   : {}{:+6}{}\n", green, reset, magenta, mg_score, reset);
     std::cout << std::format("  {}Endgame Score{}      : {}{:+6}{}\n", green, reset, magenta, eg_score, reset);
