@@ -1,5 +1,6 @@
 #include "cli.h"
 #include "search.h"
+#include "nnue.h"
 #include "types.h"
 
 #include <iostream>
@@ -210,10 +211,12 @@ void print_interactive_options() {
     std::cout << "  " << style.green << "KillerHeuristic" << style.reset << " (" << style.magenta << "kh" << style.reset << ")           : "
               << style.magenta << (Search::use_killers ? "ON" : "OFF") << style.reset << "\n";
     std::cout << "  " << style.green << "HistoryHeuristic" << style.reset << " (" << style.magenta << "hh" << style.reset << ")          : "
-              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n\n";
+              << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n";
+    std::cout << "  " << style.green << "UseNNUE" << style.reset << " (" << style.magenta << "nnue" << style.reset << ")                    : "
+              << style.magenta << (NNUE::use_nnue ? "ON" : "OFF") << style.reset << "\n\n";
     std::cout << "  " << style.green << "Usage" << style.reset << ": "
               << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]"
-              << "  (e.g., " << style.yellow << "options" << style.reset << " " << style.magenta << "lmr" << style.reset << " " << style.green << "off" << style.reset << ")\n";
+              << "  (e.g., " << style.yellow << "options" << style.reset << " " << style.magenta << "nnue" << style.reset << " " << style.green << "on" << style.reset << ")\n";
     std::cout << style.blue << "========================================================" << style.reset << "\n\n";
 }
 
@@ -230,6 +233,7 @@ void print_plain_options() {
     std::cout << "  UseTT (tt)                     : " << (Search::use_tt ? "ON" : "OFF") << "\n";
     std::cout << "  KillerHeuristic (kh)           : " << (Search::use_killers ? "ON" : "OFF") << "\n";
     std::cout << "  HistoryHeuristic (hh)          : " << (Search::use_history ? "ON" : "OFF") << "\n";
+    std::cout << "  UseNNUE (nnue)                 : " << (NNUE::use_nnue ? "ON" : "OFF") << "\n";
     std::cout << "  \nUsage: options [name [on|off]] (e.g., options lmr off)\n";
     std::cout << "=======================================\n\n";
 }

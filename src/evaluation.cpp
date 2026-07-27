@@ -340,8 +340,17 @@ void print_detailed_eval(const Position& pos, bool use_color) {
     std::cout << std::format("  {}Middlegame Score{}   : {}{:+6}{}\n", green, reset, magenta, mg_score, reset);
     std::cout << std::format("  {}Endgame Score{}      : {}{:+6}{}\n", green, reset, magenta, eg_score, reset);
     std::cout << std::format("  {}Interpolated Score{} : {}{:+6}{}\n", green, reset, magenta, score, reset);
-    std::cout << std::format("  {}Relative Score{}     : {}{:+6}{} (relative to {})\n", 
+    std::cout << std::format("  {}Classical Rel Score{} : {}{:+6}{} (relative to {})\n", 
                  green, reset, magenta, relative_score, reset, pos.side_to_move() == WHITE ? "White" : "Black");
+    std::cout << blue << "--------------------------------------------------------\n" << reset;
+    if (NNUE::use_nnue && NNUE::is_ready()) {
+        Value nnue_val = NNUE::evaluate(pos);
+        std::cout << std::format("  {}NNUE Score{}          : {}{:+6}{} (active evaluation mode)\n",
+                     green, reset, magenta, nnue_val, reset);
+    } else {
+        std::cout << std::format("  {}NNUE Evaluation{}    : {}OFF{} (load .nnue net & set 'options nnue on')\n",
+                     green, reset, magenta, reset);
+    }
     std::cout << blue << "========================================================\n" << reset;
 }
 
