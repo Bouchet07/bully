@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <mutex>
 
 #include "types.h"
 #include "uci.h"
@@ -991,48 +992,13 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
 
     MoveList list;
     list.generate_legal(pos);
-    std::vector<uint64_t> subnode_counts(list.size(), 0ULL);
 
-    int threads_count = std::max(1, Search::num_threads);
+    std::mutex output_mutex;
+    std::atomic<uint64_t> total_nodes{0};
 
-    if (threads_count <= 1 || list.size() <= 1 || depth < 2) {
-        for (size_t i = 0; i < list.size(); ++i) {
-            Move m = list[i].move;
-            StateInfo next_si;
-            pos.make_move(m, next_si);
-            subnode_counts[i] = perft_rec(pos, depth - 1);
-            pos.unmake_move(m);
-        }
-    } else {
-        std::atomic<size_t> move_idx{0};
-        std::vector<std::thread> workers;
-        workers.reserve(static_cast<size_t>(threads_count));
-
-        for (int t = 0; t < threads_count; ++t) {
-            workers.emplace_back([this, &move_idx, &list, depth, &subnode_counts]() {
-                Position thread_pos = pos;
-                while (true) {
-                    size_t i = move_idx.fetch_add(1, std::memory_order_relaxed);
-                    if (i >= list.size()) break;
-
-                    Move m = list[i].move;
-                    StateInfo next_si;
-                    thread_pos.make_move(m, next_si);
-                    subnode_counts[i] = perft_rec(thread_pos, depth - 1);
-                    thread_pos.unmake_move(m);
-                }
-            });
-        }
-
-        for (auto& w : workers) {
-            if (w.joinable()) w.join();
-        }
-    }
-
-    uint64_t total = 0;
-    for (size_t i = 0; i < list.size(); ++i) {
-        Move m = list[i].move;
-        uint64_t subnodes = subnode_counts[i];
+    auto print_move_result = [this, is_go_cmd, &output_mutex, &total_nodes](Move m, uint64_t subnodes) {
+        total_nodes.fetch_add(subnodes, std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(output_mutex);
         if (is_go_cmd) {
             std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
         } else {
@@ -1042,9 +1008,47 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
                 std::cout << std::format("  {}: {}\n", m.to_string(), subnodes);
             }
         }
-        total += subnodes;
+    };
+
+    int threads_count = std::max(1, Search::num_threads);
+
+    if (threads_count <= 1 || list.size() <= 1 || depth < 2) {
+        for (size_t i = 0; i < list.size(); ++i) {
+            Move m = list[i].move;
+            StateInfo next_si;
+            pos.make_move(m, next_si);
+            uint64_t subnodes = perft_rec(pos, depth - 1);
+            pos.unmake_move(m);
+            print_move_result(m, subnodes);
+        }
+    } else {
+        std::atomic<size_t> move_idx{0};
+        std::vector<std::thread> workers;
+        workers.reserve(static_cast<size_t>(threads_count));
+
+        for (int t = 0; t < threads_count; ++t) {
+            workers.emplace_back([this, &move_idx, &list, depth, &print_move_result]() {
+                Position thread_pos = pos;
+                while (true) {
+                    size_t i = move_idx.fetch_add(1, std::memory_order_relaxed);
+                    if (i >= list.size()) break;
+
+                    Move m = list[i].move;
+                    StateInfo next_si;
+                    thread_pos.make_move(m, next_si);
+                    uint64_t subnodes = perft_rec(thread_pos, depth - 1);
+                    thread_pos.unmake_move(m);
+                    print_move_result(m, subnodes);
+                }
+            });
+        }
+
+        for (auto& w : workers) {
+            if (w.joinable()) w.join();
+        }
     }
 
+    uint64_t total = total_nodes.load();
     if (is_go_cmd) {
         std::cout << std::format("\nNodes searched: {}\n", total);
     } else {
