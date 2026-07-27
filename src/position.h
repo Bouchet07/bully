@@ -30,39 +30,8 @@ struct StateInfo {
     int rule50 = 0;
     Key key = 0;
     Piece captured_piece = NO_PIECE;
-    std::unique_ptr<NNUE::Accumulator> accumulator;
+    NNUE::Accumulator* accumulator = nullptr;
     StateInfo* previous = nullptr;
-
-    StateInfo() = default;
-    StateInfo(const StateInfo& other)
-        : castling_rights(other.castling_rights),
-          en_passant_square(other.en_passant_square),
-          rule50(other.rule50),
-          key(other.key),
-          captured_piece(other.captured_piece),
-          previous(other.previous) {
-        if (other.accumulator) {
-            accumulator = std::make_unique<NNUE::Accumulator>(*other.accumulator);
-        }
-    }
-    StateInfo& operator=(const StateInfo& other) {
-        if (this != &other) {
-            castling_rights = other.castling_rights;
-            en_passant_square = other.en_passant_square;
-            rule50 = other.rule50;
-            key = other.key;
-            captured_piece = other.captured_piece;
-            previous = other.previous;
-            if (other.accumulator) {
-                accumulator = std::make_unique<NNUE::Accumulator>(*other.accumulator);
-            } else {
-                accumulator.reset();
-            }
-        }
-        return *this;
-    }
-    StateInfo(StateInfo&&) noexcept = default;
-    StateInfo& operator=(StateInfo&&) noexcept = default;
 };
 
 class Position {

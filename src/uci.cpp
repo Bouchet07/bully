@@ -777,6 +777,7 @@ bool UCI::execute_line(const std::string& line) {
                         else if (opt_name == "tt")  Search::use_tt = enabled;
                         else if (opt_name == "kh")  Search::use_killers = enabled;
                         else if (opt_name == "hh")  Search::use_history = enabled;
+                        else if (opt_name == "nnue" || opt_name == "nn" || opt_name == "usennue" || opt_name == "UseNNUE") NNUE::use_nnue = enabled;
                         else valid = false;
 
                         if (valid) {
@@ -809,6 +810,7 @@ bool UCI::execute_line(const std::string& line) {
                     else if (opt_name == "tt")  enabled = Search::use_tt;
                     else if (opt_name == "kh")  enabled = Search::use_killers;
                     else if (opt_name == "hh")  enabled = Search::use_history;
+                    else if (opt_name == "nnue" || opt_name == "nn" || opt_name == "usennue" || opt_name == "UseNNUE") enabled = NNUE::use_nnue;
                     else valid = false;
 
                     if (valid) {
