@@ -174,6 +174,7 @@ if(BUILD_TESTS)
         tests/test_movegen.cpp
         tests/test_tt.cpp
         tests/test_evaluation.cpp
+        tests/test_nnue.cpp
         tests/test_search.cpp
         tests/test_syzygy.cpp
         tests/test_uci.cpp
