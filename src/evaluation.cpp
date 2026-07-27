@@ -1,5 +1,6 @@
 #include "evaluation.h"
 #include "bitboard.h"
+#include "nnue.h"
 #include <utility>
 #include <iostream>
 #include <format>
@@ -267,6 +268,10 @@ template<Color Us>
 }
 
 Value evaluate(const Position& pos) {
+    if (NNUE::use_nnue && NNUE::is_ready()) {
+        return NNUE::evaluate(pos);
+    }
+
     auto [mg_white_pawns, eg_white_pawns] = evaluate_pawns<WHITE>(pos);
     auto [mg_white_pieces, eg_white_pieces] = evaluate_pieces<WHITE>(pos);
     

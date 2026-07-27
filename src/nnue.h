@@ -7,9 +7,11 @@
 #include <cstdint>
 
 #include "types.h"
-#include "position.h"
 
 namespace Bully {
+
+class Position; // Forward declaration
+
 namespace NNUE {
 
 // ============================================================================

@@ -7,6 +7,8 @@
 #include "bitboard.h"
 #include "attacks.h"
 
+#include "nnue.h"
+
 namespace Bully {
 
 // Zobrist keys for hashing positions
@@ -28,6 +30,7 @@ struct StateInfo {
     int rule50 = 0;
     Key key = 0;
     Piece captured_piece = NO_PIECE;
+    NNUE::Accumulator accumulator;
     StateInfo* previous = nullptr;
 };
 

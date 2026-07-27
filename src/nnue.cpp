@@ -1,4 +1,5 @@
 #include "nnue.h"
+#include "position.h"
 #include "bitboard.h"
 #include <iostream>
 #include <fstream>

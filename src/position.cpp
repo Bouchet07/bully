@@ -370,6 +370,10 @@ bool Position::make_move(Move m, StateInfo& new_state) {
     PieceType pt = type_of(pc);
     Color us = side_to_move_color;
 
+    if (NNUE::use_nnue && pt == KING) {
+        new_state.accumulator.computed[to_index(us)] = false;
+    }
+
     new_state.key ^= CastlingKeys[to_index(st->castling_rights)];
     if (st->en_passant_square != SQ_NONE) {
         new_state.key ^= EnPassantKeys[to_index(st->en_passant_square)];
