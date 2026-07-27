@@ -6,6 +6,7 @@
 #include <list>
 #include <thread>
 #include <vector>
+#include <atomic>
 
 #include "types.h"
 #include "uci.h"
@@ -19,6 +20,42 @@
 
 namespace Bully {
 
+namespace {
+
+uint64_t perft_rec(Position& p, int depth) {
+    if (depth <= 0) return 1ULL;
+
+    MoveList list;
+    list.generate_legal(p);
+
+    if (depth == 1) return list.size();
+
+    if (depth == 2) {
+        uint64_t nodes = 0;
+        for (size_t i = 0; i < list.size(); ++i) {
+            Move m = list[i].move;
+            StateInfo next_si;
+            p.make_move(m, next_si);
+            MoveList sub_list;
+            sub_list.generate_legal(p);
+            nodes += sub_list.size();
+            p.unmake_move(m);
+        }
+        return nodes;
+    }
+
+    uint64_t nodes = 0;
+    for (size_t i = 0; i < list.size(); ++i) {
+        Move m = list[i].move;
+        StateInfo next_si;
+        p.make_move(m, next_si);
+        nodes += perft_rec(p, depth - 1);
+        p.unmake_move(m);
+    }
+    return nodes;
+}
+
+} // anonymous namespace
 
 void UCI::init() {
     init_terminal();
@@ -47,28 +84,44 @@ uint64_t UCI::run_perft(int depth) {
 
     if (depth == 1) return list.size();
 
-    uint64_t nodes = 0;
-    if (depth == 2) {
-        for (size_t i = 0; i < list.size(); ++i) {
-            Move m = list[i].move;
-            StateInfo next_si;
-            pos.make_move(m, next_si);
-            MoveList sub_list;
-            sub_list.generate_legal(pos);
-            nodes += sub_list.size();
-            pos.unmake_move(m);
-        }
-        return nodes;
+    int threads_count = std::max(1, Search::num_threads);
+
+    if (threads_count <= 1 || list.size() <= 1 || depth < 3) {
+        return perft_rec(pos, depth);
     }
 
-    for (size_t i = 0; i < list.size(); ++i) {
-        Move m = list[i].move;
-        StateInfo next_si;
-        pos.make_move(m, next_si);
-        nodes += run_perft(depth - 1);
-        pos.unmake_move(m);
+    std::atomic<size_t> move_idx{0};
+    std::vector<uint64_t> thread_results(static_cast<size_t>(threads_count), 0ULL);
+    std::vector<std::thread> workers;
+    workers.reserve(static_cast<size_t>(threads_count));
+
+    for (int t = 0; t < threads_count; ++t) {
+        workers.emplace_back([this, &move_idx, &list, depth, &thread_results, t]() {
+            Position thread_pos = pos;
+            uint64_t local_nodes = 0;
+            while (true) {
+                size_t i = move_idx.fetch_add(1, std::memory_order_relaxed);
+                if (i >= list.size()) break;
+
+                Move m = list[i].move;
+                StateInfo next_si;
+                thread_pos.make_move(m, next_si);
+                local_nodes += perft_rec(thread_pos, depth - 1);
+                thread_pos.unmake_move(m);
+            }
+            thread_results[static_cast<size_t>(t)] = local_nodes;
+        });
     }
-    return nodes;
+
+    for (auto& w : workers) {
+        if (w.joinable()) w.join();
+    }
+
+    uint64_t total_nodes = 0;
+    for (uint64_t count : thread_results) {
+        total_nodes += count;
+    }
+    return total_nodes;
 }
 
 Move UCI::parse_move(const std::string& move_str) {
@@ -938,13 +991,48 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
 
     MoveList list;
     list.generate_legal(pos);
-    uint64_t total = 0;
+    std::vector<uint64_t> subnode_counts(list.size(), 0ULL);
 
+    int threads_count = std::max(1, Search::num_threads);
+
+    if (threads_count <= 1 || list.size() <= 1 || depth < 2) {
+        for (size_t i = 0; i < list.size(); ++i) {
+            Move m = list[i].move;
+            StateInfo next_si;
+            pos.make_move(m, next_si);
+            subnode_counts[i] = perft_rec(pos, depth - 1);
+            pos.unmake_move(m);
+        }
+    } else {
+        std::atomic<size_t> move_idx{0};
+        std::vector<std::thread> workers;
+        workers.reserve(static_cast<size_t>(threads_count));
+
+        for (int t = 0; t < threads_count; ++t) {
+            workers.emplace_back([this, &move_idx, &list, depth, &subnode_counts]() {
+                Position thread_pos = pos;
+                while (true) {
+                    size_t i = move_idx.fetch_add(1, std::memory_order_relaxed);
+                    if (i >= list.size()) break;
+
+                    Move m = list[i].move;
+                    StateInfo next_si;
+                    thread_pos.make_move(m, next_si);
+                    subnode_counts[i] = perft_rec(thread_pos, depth - 1);
+                    thread_pos.unmake_move(m);
+                }
+            });
+        }
+
+        for (auto& w : workers) {
+            if (w.joinable()) w.join();
+        }
+    }
+
+    uint64_t total = 0;
     for (size_t i = 0; i < list.size(); ++i) {
         Move m = list[i].move;
-        StateInfo next_si;
-        pos.make_move(m, next_si);
-        uint64_t subnodes = run_perft(depth - 1);
+        uint64_t subnodes = subnode_counts[i];
         if (is_go_cmd) {
             std::cout << std::format("{}: {}\n", m.to_string(), subnodes);
         } else {
@@ -955,7 +1043,6 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
             }
         }
         total += subnodes;
-        pos.unmake_move(m);
     }
 
     if (is_go_cmd) {
