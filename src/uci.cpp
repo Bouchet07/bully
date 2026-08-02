@@ -967,6 +967,72 @@ bool UCI::execute_line(const std::string& line) {
             is >> depth;
             run_benchmark(depth);
         }
+        else if (token == "info") {
+            #if defined(_WIN32) || defined(_WIN64)
+                const char* target_os = "Windows 64-bit";
+            #elif defined(__ANDROID__)
+                const char* target_os = "Android ARM64";
+            #elif defined(__linux__)
+                const char* target_os = "Linux 64-bit";
+            #elif defined(__APPLE__)
+                const char* target_os = "macOS";
+            #else
+                const char* target_os = "POSIX / Generic OS";
+            #endif
+
+            #ifndef COMPILER_NAME
+                #define COMPILER_NAME "GCC / Clang (C++23)"
+            #endif
+            #ifndef BUILD_ARCH_NAME
+                #define BUILD_ARCH_NAME "native"
+            #endif
+            #ifndef BUILD_FLAGS_STR
+                #define BUILD_FLAGS_STR "-O3 -flto"
+            #endif
+
+            std::string simds;
+            #ifdef USE_PEXT
+                simds += (simds.empty() ? "" : ", ") + std::string("PEXT (BMI2)");
+            #endif
+            #ifdef USE_VNNI
+                simds += (simds.empty() ? "" : ", ") + std::string("VNNI (Neural Math)");
+            #endif
+            #ifdef USE_DOTPROD
+                simds += (simds.empty() ? "" : ", ") + std::string("ARM DotProduct");
+            #endif
+            #if defined(__AVX512F__) || defined(__AVX512BW__)
+                simds += (simds.empty() ? "" : ", ") + std::string("AVX-512");
+            #elif defined(__AVX2__)
+                simds += (simds.empty() ? "" : ", ") + std::string("AVX2");
+            #elif defined(__SSE4_2__)
+                simds += (simds.empty() ? "" : ", ") + std::string("SSE4.2");
+            #endif
+            if (simds.empty()) simds = "Base 64-bit SIMD";
+
+            unsigned int hw_cores = std::thread::hardware_concurrency();
+
+            if (is_interactive()) {
+                std::cout << std::format("{}Bully Chess Engine - Detailed Technical System Info{}\n", style.cyan, style.reset);
+                std::cout << style.blue << "========================================================================\n" << style.reset;
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Engine Version", style.green, ENGINE_VERSION, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Executable Binary Name", style.green, BINARY_NAME, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BUILD_ARCH_NAME, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.yellow, COMPILER_NAME, style.reset);
+                std::cout << std::format(" {:<28} : {}\n", "Compilation Date & Time", __DATE__ " " __TIME__);
+                std::cout << std::format(" {:<28} : {}\n", "Operating System", target_os);
+                std::cout << std::format(" {:<28} : C++23 (LTO Release)\n", "C++ Standard & IPO");
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Flags", style.cyan, BUILD_FLAGS_STR, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Hardware SIMD Features", style.magenta, simds, style.reset);
+                std::cout << std::format(" {:<28} : {} active ({} CPU hardware cores detected)\n", "Search Threads", Search::num_threads, hw_cores);
+                std::cout << std::format(" {:<28} : {} MB ({} entries)\n", "Transposition Table Memory", TT.get_size_mb(), (TT.get_size_mb() * 1024 * 1024 / 32) * 3);
+                std::cout << std::format(" {:<28} : {}\n", "Evaluation Engine Mode", NNUE::use_nnue ? "NNUE (HalfKP SIMD Lazy Updates)" : "Handcrafted Tapered Static PST");
+                std::cout << std::format(" {:<28} : {}\n", "Syzygy Endgame Tablebases", Syzygy::max_cardinality > 0 ? std::format("Active (max {} pieces) from '{}'", Syzygy::max_cardinality, Syzygy::path) : "Disabled / None loaded");
+                std::cout << style.blue << "========================================================================\n" << style.reset;
+            } else {
+                std::cout << std::format("info name {} arch {} compiler {} date {} {} os {} threads {} hash {} MB eval {}\n",
+                                         ENGINE_NAME, BUILD_ARCH_NAME, COMPILER_NAME, __DATE__, __TIME__, target_os, Search::num_threads, TT.get_size_mb(), NNUE::use_nnue ? "nnue" : "classic");
+            }
+        }
         else if (token == "quit" || token == "exit") {
             Search::stop_and_join();
             return false;

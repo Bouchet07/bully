@@ -154,6 +154,8 @@ void print_interactive_help() {
     std::cout << "  " << style.yellow << "color" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]           : Toggle ANSI terminal colors.\n";
     std::cout << "  " << style.yellow << "autoprint" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]       : Toggle board auto-printing after moves.\n";
     std::cout << "  " << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]  : View or toggle search heuristic options.\n";
+    std::cout << "  " << style.yellow << "info" << style.reset
+              << "                       : Print detailed build, compiler, OS, flags, and SIMD info.\n";
     std::cout << "  " << style.yellow << "syzygy" << style.reset << " [" << style.magenta << "<path>" << style.reset << "|" << style.green << "on" << style.reset << "|" << style.green << "off" << style.reset << "]     : View or set Syzygy tablebases path & state.\n";
     std::cout << "  " << style.yellow << "uci" << style.reset << "                        : Switch to UCI engine mode.\n";
     std::cout << "  " << style.yellow << "quit" << style.reset << " / " << style.yellow << "exit" << style.reset
@@ -238,11 +240,6 @@ void print_plain_options() {
     std::cout << "=======================================\n\n";
 }
 
-#ifdef _WIN32
-constexpr std::string_view BINARY_NAME = "bully.exe";
-#else
-constexpr std::string_view BINARY_NAME = "bully";
-#endif
 
 void print_arguments_guide(bool use_color) {
     std::string bin(BINARY_NAME);

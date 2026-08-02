@@ -151,6 +151,13 @@ elseif(MSVC)
     target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 endif()
 
+string(JOIN " " ARCH_FLAGS_JOINED ${ARCH_FLAGS})
+target_compile_definitions(engine_lib PUBLIC
+    COMPILER_NAME="${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}"
+    BUILD_ARCH_NAME="${BULLY_ARCH}"
+    BUILD_FLAGS_STR="${ARCH_FLAGS_JOINED}"
+)
+
 # Create the main executable
 add_executable(bully src/main.cpp)
 target_link_libraries(bully PRIVATE engine_lib)
