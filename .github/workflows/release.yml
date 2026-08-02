@@ -18,8 +18,10 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         arch: [generic, modern, avx2, bmi2, avx512]
         exclude:
-          # Exclude avx2, bmi2, and avx512 on macOS. We will build a unified
-          # Apple Silicon + Intel Universal binary separately.
+          # Exclude x86 variant binaries on macOS. We build a unified
+          # Apple Silicon + Intel Universal binary separately in build-macos-universal.
+          - os: macos-latest
+            arch: modern
           - os: macos-latest
             arch: avx2
           - os: macos-latest

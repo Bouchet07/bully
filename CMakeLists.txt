@@ -68,6 +68,13 @@ target_include_directories(engine_lib PUBLIC src Pyrrhic)
 set(BULLY_ARCH "native" CACHE STRING "Target CPU architecture (generic, modern, avx2, bmi2, avx512, avx512-vnni, armv8, armv8-dotprod, native)")
 set_property(CACHE BULLY_ARCH PROPERTY STRINGS "generic" "modern" "avx2" "bmi2" "avx512" "avx512-vnni" "armv8" "armv8-dotprod" "native")
 
+# Determine if target is ARM (Android, ARM64 Apple Silicon, ARM Linux)
+if(ANDROID OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64|AARCH64" OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+    set(IS_ARM_TARGET TRUE)
+else()
+    set(IS_ARM_TARGET FALSE)
+endif()
+
 # Translate architecture selection to compiler flags and binary suffix
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Base warning and optimization flags
@@ -84,48 +91,53 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -O3
     )
 
-    if(BULLY_ARCH STREQUAL "native")
-        list(APPEND ARCH_FLAGS -march=native)
-        set(BINARY_SUFFIX "-native")
-    elseif(BULLY_ARCH STREQUAL "avx512-vnni")
-        list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl -mavx512vnni)
-        target_compile_definitions(engine_lib PUBLIC USE_PEXT USE_VNNI)
-        set(BINARY_SUFFIX "-avx512-vnni")
-    elseif(BULLY_ARCH STREQUAL "avx512")
-        list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl)
-        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
-        set(BINARY_SUFFIX "-avx512")
-    elseif(BULLY_ARCH STREQUAL "bmi2")
-        list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
-        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
-        set(BINARY_SUFFIX "-bmi2")
-    elseif(BULLY_ARCH STREQUAL "avx2")
-        list(APPEND ARCH_FLAGS -march=x86-64-v3 -mno-bmi2) # Has AVX2 but disables BMI2
-        set(BINARY_SUFFIX "-avx2")
-    elseif(BULLY_ARCH STREQUAL "modern")
-        list(APPEND ARCH_FLAGS -march=x86-64-v2) # SSE4.2 + POPCNT
-        set(BINARY_SUFFIX "-modern")
-    elseif(BULLY_ARCH STREQUAL "armv8-dotprod")
-        list(APPEND ARCH_FLAGS -march=armv8.2-a+dotprod)
-        target_compile_definitions(engine_lib PUBLIC USE_DOTPROD)
-        set(BINARY_SUFFIX "-armv8-dotprod")
-    elseif(BULLY_ARCH STREQUAL "armv8")
-        list(APPEND ARCH_FLAGS -march=armv8-a)
-        set(BINARY_SUFFIX "-armv8")
-    else()
-        # generic / standard baseline
-        if(NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i386|i686|x86")
-            list(APPEND ARCH_FLAGS -march=x86-64)
+    if(IS_ARM_TARGET)
+        if(BULLY_ARCH STREQUAL "armv8-dotprod")
+            list(APPEND ARCH_FLAGS -march=armv8.2-a+dotprod)
+            target_compile_definitions(engine_lib PUBLIC USE_DOTPROD)
+            set(BINARY_SUFFIX "-armv8-dotprod")
+        elseif(BULLY_ARCH STREQUAL "armv8")
+            list(APPEND ARCH_FLAGS -march=armv8-a)
+            set(BINARY_SUFFIX "-armv8")
+        else()
+            # For Android or generic ARM targets, do not pass x86 -march flags
+            if(ANDROID)
+                list(APPEND ARCH_FLAGS -march=armv8-a)
+            endif()
+            set(BINARY_SUFFIX "")
         endif()
-        set(BINARY_SUFFIX "")
+    else()
+        # x86-64 target architectures
+        if(BULLY_ARCH STREQUAL "native")
+            list(APPEND ARCH_FLAGS -march=native)
+            target_compile_definitions(engine_lib PUBLIC USE_PEXT)
+            set(BINARY_SUFFIX "-native")
+        elseif(BULLY_ARCH STREQUAL "avx512-vnni")
+            list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl -mavx512vnni)
+            target_compile_definitions(engine_lib PUBLIC USE_PEXT USE_VNNI)
+            set(BINARY_SUFFIX "-avx512-vnni")
+        elseif(BULLY_ARCH STREQUAL "avx512")
+            list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl)
+            target_compile_definitions(engine_lib PUBLIC USE_PEXT)
+            set(BINARY_SUFFIX "-avx512")
+        elseif(BULLY_ARCH STREQUAL "bmi2")
+            list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
+            target_compile_definitions(engine_lib PUBLIC USE_PEXT)
+            set(BINARY_SUFFIX "-bmi2")
+        elseif(BULLY_ARCH STREQUAL "avx2")
+            list(APPEND ARCH_FLAGS -march=x86-64-v3 -mno-bmi2) # Has AVX2 but disables BMI2
+            set(BINARY_SUFFIX "-avx2")
+        elseif(BULLY_ARCH STREQUAL "modern")
+            list(APPEND ARCH_FLAGS -march=x86-64-v2) # SSE4.2 + POPCNT
+            set(BINARY_SUFFIX "-modern")
+        else()
+            # generic / standard baseline x86-64
+            list(APPEND ARCH_FLAGS -march=x86-64)
+            set(BINARY_SUFFIX "")
+        endif()
     endif()
 
     target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
-
-    # If native build is selected, check if BMI2 is available for PEXT
-    if(BULLY_ARCH STREQUAL "native")
-        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
-    endif()
 
 elseif(MSVC)
     set(ARCH_FLAGS
