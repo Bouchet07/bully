@@ -1017,16 +1017,16 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << std::format(" {:<28} : {}{} {}\n", "Engine Version", style.green, ENGINE_NAME, ENGINE_VERSION, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Executable Binary Name", style.green, BINARY_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BUILD_ARCH_NAME, style.reset);
-                std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.yellow, COMPILER_NAME, style.reset);
-                std::cout << std::format(" {:<28} : {}\n", "Compilation Date & Time", __DATE__ " " __TIME__);
-                std::cout << std::format(" {:<28} : {}\n", "Operating System", target_os);
-                std::cout << std::format(" {:<28} : C++23 (LTO Release)\n", "C++ Standard & IPO");
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.green, COMPILER_NAME, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Date & Time", style.magenta, __DATE__ " " __TIME__, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Operating System", style.green, target_os, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "C++ Standard & IPO", style.green, "C++23 (LTO Release)", style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Flags", style.cyan, BUILD_FLAGS_STR, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Hardware SIMD Features", style.magenta, simds, style.reset);
-                std::cout << std::format(" {:<28} : {} active ({} CPU hardware cores detected)\n", "Search Threads", Search::num_threads, hw_cores);
-                std::cout << std::format(" {:<28} : {} MB ({} entries)\n", "Transposition Table Memory", TT.get_size_mb(), (TT.get_size_mb() * 1024 * 1024 / 32) * 3);
-                std::cout << std::format(" {:<28} : {}\n", "Evaluation Engine Mode", NNUE::use_nnue ? "NNUE (HalfKP SIMD Lazy Updates)" : "Handcrafted Tapered Static PST");
-                std::cout << std::format(" {:<28} : {}\n", "Syzygy Endgame Tablebases", Syzygy::max_cardinality > 0 ? std::format("Active (max {} pieces) from '{}'", Syzygy::max_cardinality, Syzygy::path) : "Disabled / None loaded");
+                std::cout << std::format(" {:<28} : {}{} active{} ({} CPU hardware cores detected)\n", "Search Threads", style.magenta, Search::num_threads, style.reset, hw_cores);
+                std::cout << std::format(" {:<28} : {}{} MB{} ({}{} entries{})\n", "Transposition Table Memory", style.magenta, TT.get_size_mb(), style.reset, style.magenta, (TT.get_size_mb() * 1024 * 1024 / 32) * 3, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Evaluation Engine Mode", style.green, NNUE::use_nnue ? "NNUE (HalfKP SIMD Lazy Updates)" : "Handcrafted Tapered Static PST", style.reset);
+                std::cout << std::format(" {:<28} : {}\n", "Syzygy Endgame Tablebases", Syzygy::max_cardinality > 0 ? std::format("{}{} active{} (max {}{} pieces{}) from '{}{}{}'", style.magenta, "ON", style.reset, style.magenta, Syzygy::max_cardinality, style.reset, style.green, Syzygy::path, style.reset) : std::format("{}{}{}", style.magenta, "OFF / None loaded", style.reset));
                 std::cout << style.blue << "========================================================================\n" << style.reset;
             } else {
                 std::cout << std::format("info name {} arch {} compiler {} date {} {} os {} threads {} hash {} MB eval {}\n",
