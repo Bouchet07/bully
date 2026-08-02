@@ -13,7 +13,7 @@ namespace Bully {
 // Engine Metadata & Constants
 // ============================================================================
 constexpr std::string_view ENGINE_NAME    = "Bully";
-constexpr std::string_view ENGINE_VERSION = "1.1-dev";
+constexpr std::string_view ENGINE_VERSION = "1.1";
 constexpr std::string_view ENGINE_AUTHOR  = "Diego Bouchet";
 #if defined(_WIN32)
 constexpr std::string_view BINARY_NAME    = "bully.exe";
