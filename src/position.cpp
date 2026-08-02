@@ -447,6 +447,46 @@ bool Position::make_move(Move m, StateInfo& new_state) {
     );
     new_state.key ^= CastlingKeys[to_index(new_state.castling_rights)];
 
+    // Populate NNUE dirty piece modification descriptor
+    DirtyPiece& dp = new_state.dirty_piece;
+    dp.count = 0;
+
+    if (pt != KING) {
+        if (type == PROMOTION) {
+            Piece promo_pc = make_piece(us, m.promotion_type());
+            dp.piece[0] = pc;
+            dp.from[0]  = from;
+            dp.to[0]    = SQ_NONE;
+            dp.piece[1] = promo_pc;
+            dp.from[1]  = SQ_NONE;
+            dp.to[1]    = to;
+            dp.count = 2;
+        } else {
+            dp.piece[0] = pc;
+            dp.from[0]  = from;
+            dp.to[0]    = to;
+            dp.count = 1;
+        }
+
+        if (captured != NO_PIECE) {
+            Square cap_sq = (type == EN_PASSANT) ? (to - pawn_push(us)) : to;
+            dp.piece[dp.count] = captured;
+            dp.from[dp.count]  = cap_sq;
+            dp.to[dp.count]    = SQ_NONE;
+            dp.count++;
+        }
+
+        if (type == CASTLING) {
+            Square r_from = (to == SQ_G1) ? SQ_H1 : (to == SQ_C1) ? SQ_A1 : (to == SQ_G8) ? SQ_H8 : SQ_A8;
+            Square r_to   = (to == SQ_G1) ? SQ_F1 : (to == SQ_C1) ? SQ_D1 : (to == SQ_G8) ? SQ_F8 : SQ_D8;
+            Piece rook = make_piece(us, ROOK);
+            dp.piece[dp.count] = rook;
+            dp.from[dp.count]  = r_from;
+            dp.to[dp.count]    = r_to;
+            dp.count++;
+        }
+    }
+
     side_to_move_color = ~side_to_move_color;
     st = &new_state;
 

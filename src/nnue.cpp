@@ -71,6 +71,33 @@ static inline void vec_add(int16_t* acc, const int16_t* weights) {
 #endif
 }
 
+// Helper function to vector-subtract feature weights from accumulator
+static inline void vec_sub(int16_t* acc, const int16_t* weights) {
+#if defined(USE_AVX512)
+    for (int i = 0; i < 8; ++i) {
+        __m512i a = _mm512_load_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
+        __m512i w = _mm512_load_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
+        _mm512_store_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_sub_epi16(a, w));
+    }
+#elif defined(USE_AVX2)
+    for (int i = 0; i < 16; ++i) {
+        __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
+        __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
+        _mm256_store_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_sub_epi16(a, w));
+    }
+#elif defined(USE_NEON)
+    for (int i = 0; i < 32; ++i) {
+        int16x8_t a = vld1q_s16(acc + i * 8);
+        int16x8_t w = vld1q_s16(weights + i * 8);
+        vst1q_s16(acc + i * 8, vsubq_s16(a, w));
+    }
+#else
+    for (size_t i = 0; i < TRANSFORMER_HALF_DIM; ++i) {
+        acc[i] = static_cast<int16_t>(acc[i] - weights[i]);
+    }
+#endif
+}
+
 void init() {
     net_loaded = false;
 }
@@ -150,14 +177,61 @@ void refresh_accumulator(const Position& pos, Accumulator& acc) {
     acc.computed[BLACK] = true;
 }
 
+static void update_accumulator(const Position& pos, Accumulator& acc, Color c) {
+    if (acc.computed[to_index(c)]) {
+        return;
+    }
+
+    const StateInfo* st = pos.state();
+    std::vector<const StateInfo*> chain;
+
+    while (st && st->accumulator && !st->accumulator->computed[to_index(c)]) {
+        chain.push_back(st);
+        st = st->previous;
+    }
+
+    if (st && st->accumulator && st->accumulator->computed[to_index(c)]) {
+        if (c == WHITE) {
+            acc.white = st->accumulator->white;
+        } else {
+            acc.black = st->accumulator->black;
+        }
+
+        Square ksq = pos.king_square(c);
+        int16_t* target_acc = (c == WHITE) ? acc.white.data() : acc.black.data();
+
+        for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+            const DirtyPiece& dp = (*it)->dirty_piece;
+            for (int i = 0; i < dp.count; ++i) {
+                Piece pc = dp.piece[i];
+                if (dp.from[i] != SQ_NONE) {
+                    size_t idx = feature_index(c, ksq, pc, dp.from[i]);
+                    const int16_t* w = &net_weights.feature_weights[idx * TRANSFORMER_HALF_DIM];
+                    vec_sub(target_acc, w);
+                }
+                if (dp.to[i] != SQ_NONE) {
+                    size_t idx = feature_index(c, ksq, pc, dp.to[i]);
+                    const int16_t* w = &net_weights.feature_weights[idx * TRANSFORMER_HALF_DIM];
+                    vec_add(target_acc, w);
+                }
+            }
+        }
+        acc.computed[to_index(c)] = true;
+    } else {
+        refresh_accumulator(pos, acc);
+    }
+}
+
 Value evaluate(const Position& pos) {
     if (!use_nnue || !net_loaded) {
         return VALUE_ZERO;
     }
 
-    // Refresh accumulator if needed
-    Accumulator acc;
-    refresh_accumulator(pos, acc);
+    Accumulator stack_acc;
+    Accumulator& acc = pos.state()->accumulator ? *pos.state()->accumulator : stack_acc;
+
+    update_accumulator(pos, acc, WHITE);
+    update_accumulator(pos, acc, BLACK);
 
     Color us = pos.side_to_move();
     const int16_t* us_acc   = (us == WHITE) ? acc.white.data() : acc.black.data();

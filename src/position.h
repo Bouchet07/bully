@@ -23,6 +23,14 @@ extern std::array<CastlingRights, SQUARE_NB> CastlingRightsMask;
 // Initialize Zobrist hashing keys
 void init_zobrist();
 
+// Descriptor of piece modifications for lazy incremental NNUE updates
+struct DirtyPiece {
+    int count = 0;
+    Piece piece[3] = {NO_PIECE, NO_PIECE, NO_PIECE};
+    Square from[3]  = {SQ_NONE, SQ_NONE, SQ_NONE};
+    Square to[3]    = {SQ_NONE, SQ_NONE, SQ_NONE};
+};
+
 // Holds information about the non-reversible aspects of the game state.
 struct StateInfo {
     CastlingRights castling_rights = NO_CASTLING;
@@ -32,6 +40,7 @@ struct StateInfo {
     Piece captured_piece = NO_PIECE;
     NNUE::Accumulator* accumulator = nullptr;
     StateInfo* previous = nullptr;
+    DirtyPiece dirty_piece;
 };
 
 class Position {
