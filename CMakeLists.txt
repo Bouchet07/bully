@@ -113,8 +113,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         list(APPEND ARCH_FLAGS -march=armv8-a)
         set(BINARY_SUFFIX "-armv8")
     else()
-        # generic / standard x86-64 (v1)
-        list(APPEND ARCH_FLAGS -march=x86-64)
+        # generic / standard baseline
+        if(NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i386|i686|x86")
+            list(APPEND ARCH_FLAGS -march=x86-64)
+        endif()
         set(BINARY_SUFFIX "")
     endif()
 
