@@ -91,25 +91,8 @@ void print_banner(bool use_utf8) {
     std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
     std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
 
-    #if defined(_MSC_VER)
-    std::cout << std::format("  {}Compiler{}     : {}MSVC {}{}\n", style.green, style.reset, style.magenta, _MSC_VER, style.reset);
-    #elif defined(__clang__)
-    std::cout << std::format("  {}Compiler{}     : {}Clang {}{}\n", style.green, style.reset, style.magenta, __clang_version__, style.reset);
-    #elif defined(__GNUC__)
-    std::cout << std::format("  {}Compiler{}     : {}GCC {}{}\n", style.green, style.reset, style.magenta, __VERSION__, style.reset);
-    #else
-    std::cout << std::format("  {}Compiler{}     : {}Unknown{}\n", style.green, style.reset, style.magenta, style.reset);
-    #endif
-    
-    #if defined(USE_PEXT)
-    std::cout << std::format("  {}Build{}        : {}BMI2 (PEXT){}\n", style.green, style.reset, style.magenta, style.reset);
-    #elif defined(__AVX2__)
-    std::cout << std::format("  {}Build{}        : {}AVX2{}\n", style.green, style.reset, style.magenta, style.reset);
-    #elif defined(__SSE4_2__) || defined(__POPCNT__)
-    std::cout << std::format("  {}Build{}        : {}Modern (SSE4.2/POPCNT){}\n", style.green, style.reset, style.magenta, style.reset);
-    #else
-    std::cout << std::format("  {}Build{}        : {}Generic (x86-64){}\n", style.green, style.reset, style.magenta, style.reset);
-    #endif
+    std::cout << std::format("  {}Compiler{}     : {}{}{}\n", style.green, style.reset, style.magenta, COMPILER_NAME, style.reset);
+    std::cout << std::format("  {}Build{}        : {}{}{}\n", style.green, style.reset, style.magenta, BUILD_ARCH_NAME, style.reset);
     std::cout << style.blue << "========================================================\n" << style.reset;
     std::cout << std::format("  Type '{}help{}' for custom CLI commands, or '{}uci{}' for GUI.\n", style.yellow, style.reset, style.yellow, style.reset);
     std::cout << style.blue << "========================================================\n\n" << style.reset;
