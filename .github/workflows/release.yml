@@ -16,14 +16,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [generic, modern, avx2, bmi2]
+        arch: [generic, modern, avx2, bmi2, avx512]
         exclude:
-          # Exclude avx2 and bmi2 on macOS. We will build a unified
+          # Exclude avx2, bmi2, and avx512 on macOS. We will build a unified
           # Apple Silicon + Intel Universal binary separately.
           - os: macos-latest
             arch: avx2
           - os: macos-latest
             arch: bmi2
+          - os: macos-latest
+            arch: avx512
 
     steps:
       - name: Checkout repository

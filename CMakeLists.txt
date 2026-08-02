@@ -65,8 +65,8 @@ target_include_directories(engine_lib PUBLIC src Pyrrhic)
 # ============================================================================
 # Professional Build Architecture Configurations
 # ============================================================================
-set(BULLY_ARCH "native" CACHE STRING "Target CPU architecture (generic, modern, avx2, bmi2, native)")
-set_property(CACHE BULLY_ARCH PROPERTY STRINGS "generic" "modern" "avx2" "bmi2" "native")
+set(BULLY_ARCH "native" CACHE STRING "Target CPU architecture (generic, modern, avx2, bmi2, avx512, avx512-vnni, armv8, armv8-dotprod, native)")
+set_property(CACHE BULLY_ARCH PROPERTY STRINGS "generic" "modern" "avx2" "bmi2" "avx512" "avx512-vnni" "armv8" "armv8-dotprod" "native")
 
 # Translate architecture selection to compiler flags and binary suffix
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -84,36 +84,44 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -O3
     )
 
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i386|i686|x86")
-        if(BULLY_ARCH STREQUAL "native")
-            list(APPEND ARCH_FLAGS -march=native)
-            set(BINARY_SUFFIX "-native")
-        elseif(BULLY_ARCH STREQUAL "avx512")
-            list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl)
-            set(BINARY_SUFFIX "-avx512")
-        elseif(BULLY_ARCH STREQUAL "bmi2")
-            list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
-            set(BINARY_SUFFIX "-bmi2")
-        elseif(BULLY_ARCH STREQUAL "avx2")
-            list(APPEND ARCH_FLAGS -march=x86-64-v3 -mno-bmi2) # Has AVX2 but disables BMI2 (forces magic fallback)
-            set(BINARY_SUFFIX "-avx2")
-        elseif(BULLY_ARCH STREQUAL "modern")
-            list(APPEND ARCH_FLAGS -march=x86-64-v2) # SSE4.2 + POPCNT
-            set(BINARY_SUFFIX "-modern")
-        else()
-            # generic / standard x86-64 (v1)
-            list(APPEND ARCH_FLAGS -march=x86-64)
-            set(BINARY_SUFFIX "")
-        endif()
+    if(BULLY_ARCH STREQUAL "native")
+        list(APPEND ARCH_FLAGS -march=native)
+        set(BINARY_SUFFIX "-native")
+    elseif(BULLY_ARCH STREQUAL "avx512-vnni")
+        list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl -mavx512vnni)
+        target_compile_definitions(engine_lib PUBLIC USE_PEXT USE_VNNI)
+        set(BINARY_SUFFIX "-avx512-vnni")
+    elseif(BULLY_ARCH STREQUAL "avx512")
+        list(APPEND ARCH_FLAGS -march=x86-64-v4 -mbmi2 -mavx512f -mavx512bw -mavx512dq -mavx512vl)
+        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
+        set(BINARY_SUFFIX "-avx512")
+    elseif(BULLY_ARCH STREQUAL "bmi2")
+        list(APPEND ARCH_FLAGS -march=x86-64-v3 -mbmi2) # x86-64-v3 requires AVX2/BMI2
+        target_compile_definitions(engine_lib PUBLIC USE_PEXT)
+        set(BINARY_SUFFIX "-bmi2")
+    elseif(BULLY_ARCH STREQUAL "avx2")
+        list(APPEND ARCH_FLAGS -march=x86-64-v3 -mno-bmi2) # Has AVX2 but disables BMI2
+        set(BINARY_SUFFIX "-avx2")
+    elseif(BULLY_ARCH STREQUAL "modern")
+        list(APPEND ARCH_FLAGS -march=x86-64-v2) # SSE4.2 + POPCNT
+        set(BINARY_SUFFIX "-modern")
+    elseif(BULLY_ARCH STREQUAL "armv8-dotprod")
+        list(APPEND ARCH_FLAGS -march=armv8.2-a+dotprod)
+        target_compile_definitions(engine_lib PUBLIC USE_DOTPROD)
+        set(BINARY_SUFFIX "-armv8-dotprod")
+    elseif(BULLY_ARCH STREQUAL "armv8")
+        list(APPEND ARCH_FLAGS -march=armv8-a)
+        set(BINARY_SUFFIX "-armv8")
     else()
-        # Non-x86 platforms (ARM64 macOS, Android ARM64, etc.)
+        # generic / standard x86-64 (v1)
+        list(APPEND ARCH_FLAGS -march=x86-64)
         set(BINARY_SUFFIX "")
     endif()
 
     target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 
-    # If BMI2 or native is enabled, define USE_PEXT for hardware accelerated slider lookups
-    if(BULLY_ARCH STREQUAL "bmi2" OR BULLY_ARCH STREQUAL "native")
+    # If native build is selected, check if BMI2 is available for PEXT
+    if(BULLY_ARCH STREQUAL "native")
         target_compile_definitions(engine_lib PUBLIC USE_PEXT)
     endif()
 

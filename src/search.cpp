@@ -547,6 +547,8 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         return;
     }
 
+    stopped.store(false, std::memory_order_relaxed);
+
     int threads_to_spawn = num_threads;
     if (threads_to_spawn < 1) threads_to_spawn = 1;
 
@@ -569,6 +571,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
         for (size_t k = 0; k < w->history_stack.size(); ++k) {
             w->history_stack[k].previous = (k == 0) ? nullptr : &w->history_stack[k-1];
+            w->history_stack[k].accumulator = nullptr;
         }
         w->pos = pos;
         w->pos.set_state_pointer(&w->history_stack.back());
@@ -661,10 +664,9 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 std::string pv_str = m.to_string();
                 Position pv_pos = pos;
-                std::vector<StateInfo> pv_history;
-                pv_history.reserve(static_cast<size_t>(d));
-                StateInfo first_si;
-                pv_pos.make_move(m, first_si);
+                std::vector<StateInfo> pv_history(MAX_PLY);
+                size_t pv_idx = 0;
+                pv_pos.make_move(m, pv_history[pv_idx++]);
 
                 int child_len = main_worker->ss.pv_length[1];
                 int current_depth = 1;
@@ -674,12 +676,11 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                     if (child_m == Move::none() || !child_m.is_ok()) break;
 
                     pv_str += " " + child_m.to_string();
-                    pv_history.emplace_back();
-                    if (!pv_pos.make_move(child_m, pv_history.back())) break;
+                    if (!pv_pos.make_move(child_m, pv_history[pv_idx++])) break;
                     current_depth++;
                 }
 
-                while (current_depth < d) {
+                while (current_depth < d && pv_idx < MAX_PLY) {
                     Move next_pv_move = Move::none();
                     Value dummy_score, dummy_eval;
                     int dummy_depth;
@@ -702,8 +703,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                     if (!legal) break;
 
                     pv_str += " " + next_pv_move.to_string();
-                    pv_history.emplace_back();
-                    if (!pv_pos.make_move(next_pv_move, pv_history.back())) break;
+                    if (!pv_pos.make_move(next_pv_move, pv_history[pv_idx++])) break;
                     current_depth++;
                 }
 
@@ -824,23 +824,22 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             std::string pv_str;
             Position pv_pos = pos;
-            std::vector<StateInfo> pv_history;
-            pv_history.reserve(static_cast<size_t>(d));
+            std::vector<StateInfo> pv_history(MAX_PLY);
+            size_t pv_idx = 0;
 
             int pv_len = main_worker->ss.pv_length[0];
             int current_depth = 0;
 
-            for (int j = 0; j < pv_len && current_depth < d; ++j) {
+            for (int j = 0; j < pv_len && current_depth < d && pv_idx < MAX_PLY; ++j) {
                 Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
                 if (m == Move::none() || !m.is_ok()) break;
 
                 pv_str += (pv_str.empty() ? "" : " ") + m.to_string();
-                pv_history.emplace_back();
-                if (!pv_pos.make_move(m, pv_history.back())) break;
+                if (!pv_pos.make_move(m, pv_history[pv_idx++])) break;
                 current_depth++;
             }
 
-            while (current_depth < d) {
+            while (current_depth < d && pv_idx < MAX_PLY) {
                 Move next_pv_move = Move::none();
                 Value dummy_score, dummy_eval;
                 int dummy_depth;
@@ -863,8 +862,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 if (!legal) break;
 
                 pv_str += (pv_str.empty() ? "" : " ") + next_pv_move.to_string();
-                pv_history.emplace_back();
-                if (!pv_pos.make_move(next_pv_move, pv_history.back())) break;
+                if (!pv_pos.make_move(next_pv_move, pv_history[pv_idx++])) break;
                 current_depth++;
             }
 
