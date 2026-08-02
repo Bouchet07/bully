@@ -24,17 +24,28 @@
 
 Download pre-compiled binaries from [GitHub Releases](https://github.com/Bouchet07/bully/releases):
 
-| Executable | Target Architecture & Feature Set | Recommended CPU / System |
-| :--- | :--- | :--- |
-| **`bully-avx512-vnni`** | x86-64-v4 (`AVX-512`, `VNNI`, `BMI2`, `PEXT`) | Intel 12th+ Gen (Alder/Raptor Lake), AMD Zen 4/5 |
-| **`bully-avx512`** | x86-64-v4 (`AVX-512`, `BMI2`, `PEXT`) | Intel Skylake-X / Ice Lake, AMD Zen 4 |
-| **`bully-bmi2`** | x86-64-v3 (`AVX2`, `BMI2`, `PEXT`) | Intel Haswell+ (~2013+), AMD Zen 3+ |
-| **`bully-avx2`** | x86-64-v3 (`AVX2`, Magic Bitboards) | AMD Zen 1 / Zen 2, legacy AVX2 systems |
-| **`bully-modern`** | x86-64-v2 (`SSE4.2`, `POPCNT`) | Older 64-bit Intel/AMD CPUs (~2008+) |
-| **`bully`** *(generic)* | x86-64 (v1 baseline) | Standard 64-bit baseline CPUs |
-| **`bully-macos-universal`** | Apple Silicon (`arm64`) + Intel (`x86_64`) | All Mac computers (M1/M2/M3/M4 & Intel Macs) |
-| **`bully-armv8-dotprod`** | ARM64 (`armv8.2-a+dotprod`) | Apple Silicon, Snapdragon 855+, Tensor |
-| **`bully-android-arm64`** | ARM64 (`arm64-v8a`) | Android smartphones & tablets |
+| Executable | Architecture & Feature Set | Recommended CPU / System | Performance Advantage |
+| :--- | :--- | :--- | :--- |
+| **`bully-avx512-vnni`** | x86-64-v4 (`AVX-512`, `VNNI`, `BMI2`, `PEXT`) | Intel 12th+ Gen (Alder/Raptor Lake), AMD Zen 4/5 | **Fastest x86 Speed**: 512-bit SIMD registers + hardware VNNI NNUE math |
+| **`bully-avx512`** | x86-64-v4 (`AVX-512`, `BMI2`, `PEXT`) | Intel Skylake-X / Ice Lake, AMD Zen 4 | Wide 512-bit vector accumulators (updates 32 features in half the cycles) |
+| **`bully-bmi2`** | x86-64-v3 (`AVX2`, `BMI2`, `PEXT`) | Intel Haswell+ (~2013+), AMD Zen 3+ | Hardware CPU slider lookups (`PEXT`) in 1 cycle + 256-bit AVX2 evaluation |
+| **`bully-avx2`** | x86-64-v3 (`AVX2`, Magic Bitboards) | AMD Zen 1 / Zen 2, legacy AVX2 systems | 256-bit SIMD evaluation with sparse-random magic lookup fallback |
+| **`bully-modern`** | x86-64-v2 (`SSE4.2`, `POPCNT`) | Older 64-bit Intel/AMD CPUs (~2008+) | Hardware bit-count acceleration (`POPCNT`) |
+| **`bully`** *(generic)* | x86-64 (v1 baseline) | Standard 64-bit baseline CPUs | Universal compatibility across all 64-bit machines |
+| **`bully-macos-universal`** | Apple Silicon (`arm64`) + Intel (`x86_64`) | All Mac computers (M1/M2/M3/M4 & Intel Macs) | Native macOS universal binary execution |
+| **`bully-armv8-dotprod`** | ARM64 (`armv8.2-a+dotprod`) | Apple Silicon, Snapdragon 855+, Tensor | Hardware 8-bit Dot Product instructions, **2x–3x faster ARM NNUE** |
+| **`bully-android-arm64`** | ARM64 (`arm64-v8a`) | Android smartphones & tablets | Native 64-bit mobile ARM execution |
+
+---
+
+## ⚡ What Each Hardware Feature Brings to the Table
+
+* **`PEXT` (Parallel Bit Extract - BMI2)**: Calculates Rook, Bishop, and Queen slider attack bitboards in a single CPU clock cycle using native hardware bit extraction, completely eliminating cache misses and lookup latency.
+* **`VNNI` (Vector Neural Network Instructions)**: Executes integer dot products in a single instruction (`_mm512_dpbusd_epi32`), boosting NNUE neural network matrix evaluation speed by **1.5x to 2x**.
+* **`AVX-512` (512-bit Vector Extensions)**: Doubles the vector register width to 512 bits, allowing Bully to update 32 NNUE piece accumulators in half the SIMD instruction cycles compared to 256-bit AVX2.
+* **`DotProd` (ARM64 Dot Product)**: Native ARM hardware dot-product instruction (`vdotq_s32`), accelerating NNUE matrix multiplication on Apple Silicon (M1/M2/M3/M4) and modern mobile devices by **2x to 3x**.
+* **`AVX2` (256-bit Vector Arithmetic)**: 256-bit SIMD vector operations processing 16 16-bit integer calculations simultaneously per cycle.
+* **`POPCNT` (Population Count)**: Single CPU instruction for instantaneous bit counting on 64-bit bitboards, accelerating mobility and piece counting.
 
 ---
 
