@@ -1,3 +1,12 @@
+/**
+ * @file position.h
+ * @brief Chess Board Representation, Copy-Free State Info, and Move Execution.
+ *
+ * Implements the core `Position` class tracking mailbox square boards and dual bitboard sets
+ * (by piece type and by color). Supports copy-free incremental board updates using caller-allocated
+ * `StateInfo` stack links, 64-bit Zobrist key hashing, Static Exchange Evaluation (SEE), and NNUE dirty state.
+ */
+
 #pragma once
 
 #include <string>

@@ -5,6 +5,7 @@
 #include <list>
 #include "types.h"
 #include "position.h"
+#include "movegen.h"
 
 namespace Bully {
 namespace Search {
@@ -57,6 +58,9 @@ struct SearchState {
     // Triangular PV Table
     std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table{};
     std::array<int, MAX_PLY> pv_length{};
+
+    // Heap-allocated per-ply MoveList array to eliminate function call stack bloat
+    std::array<MoveList, MAX_PLY> move_list{};
 
     // Check if we should abort the search (e.g. time limit reached)
     void check_limits();

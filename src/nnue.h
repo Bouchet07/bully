@@ -1,3 +1,11 @@
+/**
+ * @file nnue.h
+ * @brief Efficiently Updatable Neural Network (NNUE) Evaluation Architecture.
+ *
+ * Defines HalfKP 256x2-32-32-1 NNUE evaluation data structures, 64-byte aligned accumulators,
+ * feature indexing relative to King square perspectives, and binary net loading functions (.nnue).
+ */
+
 #pragma once
 
 #include <string>

@@ -1,3 +1,11 @@
+/**
+ * @file syzygy.h
+ * @brief Syzygy Endgame Tablebase Probing Wrapper (Pyrrhic C++20 Integration).
+ *
+ * Provides root DTZ (Distance To Zero) move probing for instant perfect move execution
+ * in endgames (3-5 pieces), and WDL (Win/Draw/Loss) probing during tree search for early node pruning.
+ */
+
 #ifndef BULLY_SYZYGY_H
 #define BULLY_SYZYGY_H
 

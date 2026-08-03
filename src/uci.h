@@ -1,3 +1,12 @@
+/**
+ * @file uci.h
+ * @brief Universal Chess Interface (UCI) Protocol & CLI Control Loop.
+ *
+ * Implements the standard UCI protocol for interfacing with chess GUIs (CuteChess, Nibbler, etc.),
+ * interactive CLI shell mode, command sequence execution via CLI arguments, perft/divide tools,
+ * and the engine benchmark suite.
+ */
+
 #pragma once
 
 #include <list>

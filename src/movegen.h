@@ -1,3 +1,12 @@
+/**
+ * @file movegen.h
+ * @brief Move Generation API and ExtMove / MoveList Containers.
+ *
+ * Implements high-performance pseudo-legal and legal move generation for all piece types,
+ * including specialized capture generation for Quiescence Search. Uses the zero-allocation
+ * `MoveList` container storing scored `ExtMove` elements for fast sorting in move ordering.
+ */
+
 #pragma once
 
 #include <array>

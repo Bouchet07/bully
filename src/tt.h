@@ -1,3 +1,13 @@
+/**
+ * @file tt.h
+ * @brief Cache-Aligned Lock-Free Transposition Table Architecture.
+ *
+ * Implements a high-performance Transposition Table stored in 32-byte cache-aligned clusters.
+ * Each 32-byte cluster fits 3 10-byte entries with XOR key encryption to prevent torn reads
+ * across parallel threads without needing mutex locks. Supports age-based and depth-preferred
+ * replacement strategies and mate score normalization.
+ */
+
 #pragma once
 
 #include <array>

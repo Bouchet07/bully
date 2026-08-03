@@ -1015,7 +1015,6 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << std::format("{}Bully Chess Engine - Detailed Technical System Info{}\n", style.cyan, style.reset);
                 std::cout << style.blue << "========================================================================\n" << style.reset;
                 std::cout << std::format(" {:<28} : {}{} {}\n", "Engine Version", style.green, ENGINE_NAME, ENGINE_VERSION, style.reset);
-                std::cout << std::format(" {:<28} : {}{}{}\n", "Executable Binary Name", style.green, BINARY_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BUILD_ARCH_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.green, COMPILER_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Date & Time", style.magenta, __DATE__ " " __TIME__, style.reset);

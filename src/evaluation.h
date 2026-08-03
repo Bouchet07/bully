@@ -1,3 +1,11 @@
+/**
+ * @file evaluation.h
+ * @brief Static Evaluation Interface & Tapered Classical Evaluation.
+ *
+ * Implements static position evaluation returning centipawn scores relative to the side to move.
+ * Blends Middlegame and Endgame Piece-Square Tables (PST) dynamically based on non-pawn material phase points.
+ */
+
 #pragma once
 
 #include "types.h"

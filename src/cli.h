@@ -1,3 +1,11 @@
+/**
+ * @file cli.h
+ * @brief Interactive CLI Formatting, ANSI Styling, and UTF-8 Terminal Utilities.
+ *
+ * Provides terminal environment detection (`is_interactive`, `detect_utf8`), Windows virtual terminal
+ * sequence initialization, ANSI color styling tokens, formatted help displays, and banner rendering.
+ */
+
 #pragma once
 
 #include <string>

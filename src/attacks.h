@@ -1,3 +1,13 @@
+/**
+ * @file attacks.h
+ * @brief Precomputed Attack Tables and Slider Attack Generators.
+ *
+ * Efficient precomputed move attack lookups for non-sliding pieces (Pawns, Knights, Kings)
+ * and sliding pieces (Rooks, Bishops, Queens). Sliding piece attacks utilize BMI2 PEXT
+ * (Parallel Bit Extract) instructions when hardware support is enabled (`USE_PEXT`), falling
+ * back to portable Magic Bitboards on non-BMI2 architectures (e.g. ARM64).
+ */
+
 #pragma once
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)

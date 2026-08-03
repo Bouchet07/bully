@@ -1,3 +1,12 @@
+/**
+ * @file main.cpp
+ * @brief Application Entry Point for Bully Chess Engine.
+ *
+ * Initializes core tables (bitboards, attack lookups, Zobrist keys), configures the UCI/CLI handler,
+ * parses optional command-line command sequences (e.g., `bully.exe "position startpos; go depth 8; quit"`),
+ * and enters the primary interactive UCI communication loop.
+ */
+
 #include "bitboard.h"
 #include "attacks.h"
 #include "position.h"

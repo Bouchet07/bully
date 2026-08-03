@@ -1,3 +1,12 @@
+/**
+ * @file bitboard.h
+ * @brief Bitboard Operations, Hardware Intrinsics, and Geometric Lookups.
+ *
+ * Provides low-level bitboard manipulation tools utilizing C++20 standard hardware
+ * intrinsics (<bit>), including POPCNT and TZCNT. Also defines file/rank bitmasks,
+ * direction shift templates, and array-based lookup tables (LineBB, BetweenBB, SquareDistance).
+ */
+
 #pragma once
 
 #include <array>

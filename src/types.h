@@ -1,3 +1,15 @@
+/**
+ * @file types.h
+ * @brief Core Type Definitions, Enums, Constants, and Packed Move Representation.
+ *
+ * This header defines the fundamental domain types used throughout the Bully chess engine:
+ *  - Strongly-typed enums for Squares, Pieces, Colors, Ranks, Files, and Directions.
+ *  - High-performance bitboard (uint64_t) and Zobrist key aliases.
+ *  - Evaluation constants, mate bounds, and piece material values.
+ *  - Compact 16-bit packed Move encoding for minimal L1 cache & Transposition Table footprint.
+ *  - C++23 std::to_underlying helper utilities and array index conversion functions.
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -22,7 +34,10 @@ constexpr std::string_view BINARY_NAME    = "bully";
 #endif
 constexpr std::string_view UCI_OPTIONS    = "option name Hash type spin default 16 min 1 max 2048\noption name Clear Hash type button\noption name Threads type spin default 1 min -1 max 128\noption name SyzygyPath type string default syzygy\noption name UseNNUE type check default false\noption name EvalFile type string default nn-7821938.nnue\noption name MultiPV type spin default 1 min 1 max 128\noption name NullMovePruning type check default true\noption name LateMoveReduction type check default true\noption name ReverseFutilityPruning type check default true\noption name LateMovePruning type check default true\noption name FutilityPruning type check default true\noption name CheckExtensions type check default true\noption name AspirationWindow type check default true\noption name QuiescenceSearch type check default true\noption name UseTT type check default true\noption name KillerHeuristic type check default true\noption name HistoryHeuristic type check default true\noption name Ponder type check default false";
 
+/// 64-bit Zobrist position hash key
 using Key      = uint64_t;
+
+/// 64-bit Bitboard representation (1 bit per chessboard square)
 using Bitboard = uint64_t;
 
 constexpr uint16_t MAX_MOVES         = 256;

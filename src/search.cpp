@@ -154,6 +154,10 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
         return VALUE_ZERO;
     }
 
+    if (ply >= MAX_PLY - 1) {
+        return Eval::evaluate(pos);
+    }
+
     if (is_repetition(pos) || pos.rule50() >= 100) {
         return VALUE_DRAW;
     }
@@ -173,7 +177,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
         }
     }
 
-    MoveList list;
+    MoveList& list = ss.move_list[to_index(ply)];
     if (in_check) {
         list.generate(pos);
     } else {
@@ -247,6 +251,10 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
+    if (ply >= MAX_PLY - 1) {
+        return Eval::evaluate(pos);
+    }
+
     if (depth <= 0) {
         return use_quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : Eval::evaluate(pos);
     }
@@ -306,7 +314,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
-    MoveList list;
+    MoveList& list = ss.move_list[to_index(ply)];
     list.generate(pos);
 
     for (size_t i = 0; i < list.size(); ++i) {
@@ -565,16 +573,21 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         
         // Clone stack history
         w->history_stack.clear();
-        w->history_stack.reserve(history_copy.size());
-        for (const auto& si : history_copy) {
-            w->history_stack.push_back(si);
+        if (history_copy.empty()) {
+            w->history_stack.emplace_back();
+            w->pos.set_fen(pos.get_fen(), w->history_stack.back());
+        } else {
+            w->history_stack.reserve(history_copy.size());
+            for (const auto& si : history_copy) {
+                w->history_stack.push_back(si);
+            }
+            for (size_t k = 0; k < w->history_stack.size(); ++k) {
+                w->history_stack[k].previous = (k == 0) ? nullptr : &w->history_stack[k-1];
+                w->history_stack[k].accumulator = nullptr;
+            }
+            w->pos = pos;
+            w->pos.set_state_pointer(&w->history_stack.back());
         }
-        for (size_t k = 0; k < w->history_stack.size(); ++k) {
-            w->history_stack[k].previous = (k == 0) ? nullptr : &w->history_stack[k-1];
-            w->history_stack[k].accumulator = nullptr;
-        }
-        w->pos = pos;
-        w->pos.set_state_pointer(&w->history_stack.back());
 
         active_workers.push_back(w.get());
         workers.push_back(std::move(w));
@@ -608,8 +621,8 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 rm.move = list[i].move;
                 rm.score = -VALUE_INFINITE;
                 root_moves.push_back(rm);
+                main_worker->pos.unmake_move(list[i].move);
             }
-            main_worker->pos.unmake_move(list[i].move);
         }
     }
 
