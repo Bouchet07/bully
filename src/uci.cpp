@@ -489,6 +489,15 @@ bool UCI::execute_line(const std::string& line) {
                         }
                     }
                 }
+                // Re-link previous state pointers in case std::list/vector elements were relocated or re-linked
+                StateInfo* prev_st = nullptr;
+                for (auto& st_entry : history) {
+                    st_entry.previous = prev_st;
+                    prev_st = &st_entry;
+                }
+                if (!history.empty()) {
+                    pos.set_state_pointer(&history.back());
+                }
             } else {
                 if (subtoken.empty()) {
                     if (is_interactive()) {

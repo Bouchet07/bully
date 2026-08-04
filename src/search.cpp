@@ -411,17 +411,21 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
                     if (prev_move.is_ok()) {
                         Piece pc1 = pos.piece_on(prev_move.to_sq());
-                        size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
-                        if (prev_idx1 < 1024) {
-                            heuristics.cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())] += bonus;
+                        if (pc1 != NO_PIECE) {
+                            size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                            if (prev_idx1 < 1024) {
+                                heuristics.cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())] += bonus;
+                            }
                         }
                     }
 
                     if (prev_move_2.is_ok()) {
                         Piece pc2 = pos.piece_on(prev_move_2.to_sq());
-                        size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
-                        if (prev_idx2 < 1024) {
-                            heuristics.cont_history_2[prev_idx2][to_index(pc2)][to_index(m.to_sq())] += bonus;
+                        if (pc2 != NO_PIECE) {
+                            size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                            if (prev_idx2 < 1024) {
+                                heuristics.cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())] += bonus;
+                            }
                         }
                     }
 
@@ -434,9 +438,21 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
                             if (prev_move.is_ok()) {
                                 Piece pc1 = pos.piece_on(prev_move.to_sq());
-                                size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
-                                if (prev_idx1 < 1024) {
-                                    heuristics.cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+                                if (pc1 != NO_PIECE) {
+                                    size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                                    if (prev_idx1 < 1024) {
+                                        heuristics.cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+                                    }
+                                }
+                            }
+
+                            if (prev_move_2.is_ok()) {
+                                Piece pc2 = pos.piece_on(prev_move_2.to_sq());
+                                if (pc2 != NO_PIECE) {
+                                    size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                                    if (prev_idx2 < 1024) {
+                                        heuristics.cont_history_2[prev_idx2][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+                                    }
                                 }
                             }
                         }
@@ -567,14 +583,14 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         w->ss.time_limit = time_limit;
         w->ss.accumulators = w->accumulators.data();
         
-        // Clone stack history
+        // Clone stack history with guaranteed capacity reserved
         w->history_stack.clear();
+        w->history_stack.reserve(history_copy.size() + MAX_PLY + 256);
         if (history_copy.empty()) {
             w->history_stack.emplace_back();
             w->history_stack.back().accumulator = &w->accumulators[0];
             w->pos.set_fen(pos.get_fen(), w->history_stack.back());
         } else {
-            w->history_stack.reserve(history_copy.size());
             for (const auto& si : history_copy) {
                 w->history_stack.push_back(si);
             }
@@ -613,6 +629,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         list.generate(pos);
         for (size_t i = 0; i < list.size(); ++i) {
             StateInfo si;
+            si.accumulator = &main_worker->accumulators[0];
             if (main_worker->pos.make_move(list[i].move, si)) {
                 RootMove rm;
                 rm.move = list[i].move;
@@ -643,6 +660,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 Move m = root_moves[i].move;
                 StateInfo si;
+                si.accumulator = &main_worker->accumulators[0];
                 if (!main_worker->pos.make_move(m, si)) {
                     continue;
                 }
@@ -891,6 +909,10 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             }
 
             if (limits.time_controlled() && elapsed >= time_limit) {
+                break;
+            }
+
+            if (limits.depth == -1 && std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
                 break;
             }
 

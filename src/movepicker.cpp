@@ -49,17 +49,21 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
 
         if (prev_move.is_ok()) {
             Piece pc1 = pos.piece_on(prev_move.to_sq());
-            size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
-            if (prev_idx1 < 1024) {
-                score += heuristics->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())];
+            if (pc1 != NO_PIECE) {
+                size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                if (prev_idx1 < 1024) {
+                    score += heuristics->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())];
+                }
             }
         }
 
         if (prev_move_2.is_ok()) {
             Piece pc2 = pos.piece_on(prev_move_2.to_sq());
-            size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
-            if (prev_idx2 < 1024) {
-                score += heuristics->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())];
+            if (pc2 != NO_PIECE) {
+                size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                if (prev_idx2 < 1024) {
+                    score += heuristics->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())];
+                }
             }
         }
     }
