@@ -77,6 +77,17 @@ void Position::move_piece_internal(Square from, Square to) {
     board[to_idx] = pc;
 }
 
+Key Position::pawn_key() const {
+    Key k = 0;
+    Bitboard pawns = pieces(PAWN);
+    while (pawns) {
+        Square sq = lsb(pawns);
+        pawns &= pawns - 1;
+        k ^= PieceKeys[to_index(board[to_index(sq)])][to_index(sq)];
+    }
+    return k;
+}
+
 Key Position::compute_key() const {
     Key k = 0;
     for (size_t sq = 0; sq < SQUARE_NB; ++sq) {

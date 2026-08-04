@@ -81,6 +81,36 @@ struct Heuristics {
     }
 };
 
+// Correction History table mapping pawn structures to static evaluation adjustments
+constexpr size_t CORR_HIST_SIZE = 16384;
+constexpr int CORR_HIST_MAX = 16384;
+
+struct CorrectionHistory {
+    std::array<std::array<int16_t, CORR_HIST_SIZE>, COLOR_NB> table{};
+
+    void clear() {
+        for (auto& t : table) t.fill(0);
+    }
+
+    [[nodiscard]] int get_correction(const Position& pos) const {
+        Key k = pos.pawn_key();
+        Color c = pos.side_to_move();
+        int score = table[to_index(c)][k % CORR_HIST_SIZE];
+        return score / 256;
+    }
+
+    void update(const Position& pos, int bonus) {
+        Key k = pos.pawn_key();
+        Color c = pos.side_to_move();
+        size_t idx = k % CORR_HIST_SIZE;
+        int16_t& entry = table[to_index(c)][idx];
+        
+        int clamped_bonus = std::clamp(bonus * 16, -CORR_HIST_MAX, CORR_HIST_MAX);
+        int new_val = entry + clamped_bonus - (entry * std::abs(clamped_bonus)) / CORR_HIST_MAX;
+        entry = static_cast<int16_t>(std::clamp(new_val, -CORR_HIST_MAX, CORR_HIST_MAX));
+    }
+};
+
 // Statistics and timing tracking for the active search
 struct SearchState {
     Limits limits;
@@ -89,6 +119,7 @@ struct SearchState {
     int time_limit = -1;  // Calculated optimal search time (ms)
     int thread_id = 0;    // Thread ID (0 = main thread, >0 = helper threads)
     NNUE::Accumulator* accumulators = nullptr; // Pointer to worker accumulators array
+    CorrectionHistory* correction_history = nullptr;
     
     // Triangular PV Table
     std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table{};

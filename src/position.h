@@ -110,6 +110,7 @@ public:
     [[nodiscard]] Square king_square(Color c) const { return get_LSB(pieces(c, KING)); }
     
     [[nodiscard]] Key key() const { return st->key; }
+    [[nodiscard]] Key pawn_key() const;
     [[nodiscard]] Square en_passant_square() const { return st->en_passant_square; }
     [[nodiscard]] CastlingRights castling_rights() const { return st->castling_rights; }
     [[nodiscard]] int rule50() const { return st->rule50; }

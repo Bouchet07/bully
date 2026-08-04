@@ -96,6 +96,12 @@ void SearchState::check_limits() {
 
 
 
+static Value evaluate_position(const Position& pos, const SearchState& ss) {
+    Value v = Eval::evaluate(pos);
+    int corr = ss.correction_history ? ss.correction_history->get_correction(pos) : 0;
+    return static_cast<Value>(std::clamp(v + corr, -VALUE_TB + 1, VALUE_TB - 1));
+}
+
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
@@ -106,7 +112,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     }
 
     if (ply >= MAX_PLY - 1) {
-        return Eval::evaluate(pos);
+        return evaluate_position(pos, ss);
     }
 
     if (is_repetition(pos) || pos.rule50() >= 100) {
@@ -119,7 +125,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 
     Value stand_pat = VALUE_NONE;
     if (!in_check) {
-        stand_pat = Eval::evaluate(pos);
+        stand_pat = evaluate_position(pos, ss);
         if (stand_pat >= beta) {
             return beta;
         }
@@ -181,11 +187,11 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     if (ply >= MAX_PLY - 1) {
-        return Eval::evaluate(pos);
+        return evaluate_position(pos, ss);
     }
 
     if (depth <= 0) {
-        return use_quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : Eval::evaluate(pos);
+        return use_quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : evaluate_position(pos, ss);
     }
 
     ss.seldepth = std::max(ss.seldepth, ply);
@@ -212,6 +218,8 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     bool in_check = pos.in_check();
     int extension = (use_check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
 
+    Value static_eval = evaluate_position(pos, ss);
+
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
     if (use_rfp
         && !in_check
@@ -219,7 +227,6 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         && beta - alpha <= 1
         && std::abs(beta) < VALUE_MATE_IN_MAX_PLY) {
         
-        Value static_eval = Eval::evaluate(pos);
         int margin = 80 * depth;
         if (static_eval - margin >= beta) {
             return static_eval;
@@ -227,7 +234,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     // 2. Null Move Pruning (NMP)
-    if (use_nmp && !in_check && depth >= 3 && Eval::evaluate(pos) >= beta) {
+    if (use_nmp && !in_check && depth >= 3 && static_eval >= beta) {
         Bitboard major_pieces = pos.pieces(us) ^ pos.pieces(us, PAWN) ^ pos.pieces(us, KING);
         if (major_pieces != 0) {
             StateInfo next_si;
@@ -269,7 +276,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             // Futility Pruning: Prune quiet moves at depth 1 when evaluation is far below alpha
             if (use_fp && !in_check && depth == 1) {
                 int margin = 150;
-                if (Eval::evaluate(pos) + margin < alpha) {
+                if (static_eval + margin < alpha) {
                     continue;
                 }
             }
@@ -388,8 +395,15 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
+    if (ss.correction_history && !in_check && depth >= 2) {
+        if (best_score >= beta || (best_score > -VALUE_INFINITE && best_score <= alpha)) {
+            int bonus = std::clamp((best_score - static_eval) * depth, -1024, 1024);
+            ss.correction_history->update(pos, bonus);
+        }
+    }
+
     if (use_tt) {
-        TT.save(pos.key(), best_move, best_score, Eval::evaluate(pos), depth, bound_type, ply);
+        TT.save(pos.key(), best_move, best_score, static_eval, depth, bound_type, ply);
     }
 
     return best_score;
