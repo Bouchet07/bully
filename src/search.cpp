@@ -8,6 +8,13 @@
 #include <memory>
 #include <cmath>
 
+#if defined(_WIN32)
+    #include <windows.h>
+#elif defined(__linux__)
+    #include <pthread.h>
+    #include <sched.h>
+#endif
+
 #include "search.h"
 #include "tt.h"
 #include "movegen.h"
@@ -18,6 +25,26 @@
 
 namespace Bully {
 namespace Search {
+
+static void bind_thread_affinity(int thread_id) {
+#if defined(_WIN32)
+    unsigned int hardware_threads = std::thread::hardware_concurrency();
+    if (hardware_threads > 0) {
+        DWORD_PTR mask = 1ULL << (static_cast<unsigned int>(thread_id) % hardware_threads);
+        SetThreadAffinityMask(GetCurrentThread(), mask);
+    }
+#elif defined(__linux__)
+    unsigned int hardware_threads = std::thread::hardware_concurrency();
+    if (hardware_threads > 0) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(static_cast<unsigned int>(thread_id) % hardware_threads, &cpuset);
+        pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+    }
+#else
+    (void)thread_id;
+#endif
+}
 
 // Global variables
 std::atomic<bool> stopped(true);
@@ -448,6 +475,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
 // Single Worker thread entry point
 static void worker_run(SearchWorker* w) {
+    bind_thread_affinity(w->id);
     w->heuristics.clear();
     int start_depth = 1 + (w->id & 1); // Alternating starting depths
     int max_search_depth = (w->ss.limits.depth != -1) ? w->ss.limits.depth : MAX_PLY;

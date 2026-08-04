@@ -2,33 +2,76 @@
 #include <cstdlib>
 
 #if defined(_WIN32)
+    #include <windows.h>
     #include <malloc.h>
+#else
+    #include <sys/mman.h>
+    #include <unistd.h>
 #endif
 
 #include "tt.h"
 
 namespace Bully {
 
-// Instantiate the global Transposition Table
+// Instantiate global Transposition Table
 TranspositionTable TT;
+
+static void* aligned_large_pages_alloc(size_t bytes) {
+    if (bytes == 0) return nullptr;
+#if defined(_WIN32)
+    // 1. Try Windows Large Pages (2MB Huge Pages)
+    void* mem = VirtualAlloc(nullptr, bytes, MEM_COMMIT | MEM_RESERVE | MEM_LARGE_PAGES, PAGE_READWRITE);
+    if (mem) return mem;
+
+    // 2. Fallback to VirtualAlloc (standard 4KB pages)
+    mem = VirtualAlloc(nullptr, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (mem) return mem;
+
+    // 3. Fallback to _aligned_malloc
+    return _aligned_malloc(bytes, 64);
+#elif defined(__linux__)
+    // 1. Try Linux Hugetlbfs MAP_HUGETLB
+    void* mem = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+    if (mem != MAP_FAILED) return mem;
+
+    // 2. Fallback to posix_memalign
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr, 64, bytes) == 0) return ptr;
+    return nullptr;
+#else
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr, 64, bytes) == 0) return ptr;
+    return nullptr;
+#endif
+}
+
+static void aligned_large_pages_free(void* ptr, size_t bytes) {
+    if (!ptr) return;
+#if defined(_WIN32)
+    (void)bytes;
+    if (!VirtualFree(ptr, 0, MEM_RELEASE)) {
+        _aligned_free(ptr);
+    }
+#elif defined(__linux__)
+    if (munmap(ptr, bytes) != 0) {
+        free(ptr);
+    }
+#else
+    (void)bytes;
+    free(ptr);
+#endif
+}
 
 TranspositionTable::~TranspositionTable() {
     if (table) {
-#if defined(_WIN32)
-        _aligned_free(table);
-#else
-        free(table);
-#endif
+        aligned_large_pages_free(table, cluster_count * sizeof(Cluster));
+        table = nullptr;
     }
 }
 
 void TranspositionTable::resize(size_t mb_size) {
     if (table) {
-#if defined(_WIN32)
-        _aligned_free(table);
-#else
-        free(table);
-#endif
+        aligned_large_pages_free(table, cluster_count * sizeof(Cluster));
         table = nullptr;
     }
 
@@ -39,7 +82,7 @@ void TranspositionTable::resize(size_t mb_size) {
 
     size_t size_bytes = mb_size * 1024 * 1024;
     
-    // Find the largest power of 2 clusters that fits within the requested size
+    // Find the largest power of 2 clusters that fits within requested size
     cluster_count = 1;
     while (cluster_count * sizeof(Cluster) <= size_bytes) {
         cluster_count <<= 1;
@@ -52,17 +95,8 @@ void TranspositionTable::resize(size_t mb_size) {
 
     size_t alloc_bytes = cluster_count * sizeof(Cluster);
 
-    // Allocate memory aligned to 64-byte boundary (cache line aligned)
-#if defined(_WIN32)
-    table = static_cast<Cluster*>(_aligned_malloc(alloc_bytes, 64));
-#else
-    void* mem = nullptr;
-    if (posix_memalign(&mem, 64, alloc_bytes) == 0) {
-        table = static_cast<Cluster*>(mem);
-    } else {
-        table = nullptr;
-    }
-#endif
+    // Allocate memory using OS Large Pages allocator
+    table = static_cast<Cluster*>(aligned_large_pages_alloc(alloc_bytes));
 
     clear();
 }
@@ -78,7 +112,7 @@ bool TranspositionTable::probe(Key key, Move& move, Value& score, Value& eval, i
         return false;
     }
 
-    // Fast bitwise AND index calculation (since cluster_count is a power of 2)
+    // Fast bitwise AND index calculation (power of 2 cluster count)
     size_t idx = key & (cluster_count - 1);
     uint16_t key16 = static_cast<uint16_t>(key >> 48);
     Cluster& c = table[idx];
@@ -86,7 +120,6 @@ bool TranspositionTable::probe(Key key, Move& move, Value& score, Value& eval, i
     for (size_t i = 0; i < 3; ++i) {
         TTEntry& entry = c.entries[i];
         if (entry.key16 == key16 && entry.bound() != BOUND_NONE) {
-            // Hit! Extract variables using XOR decryption
             move = entry.move(key16);
             score = score_from_tt(entry.score(key16), ply);
             eval = entry.eval(key16);
@@ -108,46 +141,27 @@ void TranspositionTable::save(Key key, Move move, Value score, Value eval, int d
     uint16_t key16 = static_cast<uint16_t>(key >> 48);
     Cluster& c = table[idx];
 
-    TTEntry* replace_entry = nullptr;
-    int best_score = -99999; // Value heuristic score for entry replacement
+    TTEntry* replace = nullptr;
+    int min_val = 100000;
 
     for (size_t i = 0; i < 3; ++i) {
         TTEntry& entry = c.entries[i];
         
-        // Scenario 1: Same position. Overwrite it.
-        if (entry.key16 == key16) {
-            replace_entry = &entry;
+        if (entry.key16 == key16 || entry.bound() == BOUND_NONE) {
+            replace = &entry;
             break;
         }
 
-        // Scenario 2: Unused slot. Highest priority replacement.
-        if (entry.bound() == BOUND_NONE) {
-            replace_entry = &entry;
-            break;
-        }
-
-        // Calculate replacement priority heuristic score
-        // We prefer keeping deep searches and recent (young) entries.
-        int entry_age_diff = (age_count >= entry.age()) ? (age_count - entry.age()) : (64 - (entry.age() - age_count));
-        
-        // Heuristic formula: older entries are easier to replace, deep entries are harder to replace
-        int score_priority = entry_age_diff * 4 - entry.depth8;
-        if (score_priority > best_score) {
-            best_score = score_priority;
-            replace_entry = &entry;
+        int score_val = entry.depth8 - (entry.age() * 2);
+        if (score_val < min_val) {
+            min_val = score_val;
+            replace = &entry;
         }
     }
 
-    // Preserve the existing move if the new move is null/none
-    Move final_move = move;
-    if (final_move == Move::none() && replace_entry->key16 == key16) {
-        final_move = replace_entry->move(key16);
+    if (replace) {
+        replace->save(key16, move, score_to_tt(score, ply), eval, static_cast<uint8_t>(depth), bound, age_count);
     }
-
-    // Save normalization score (normalize checkmates)
-    Value normalized_score = score_to_tt(score, ply);
-
-    replace_entry->save(key16, final_move, normalized_score, eval, static_cast<uint8_t>(depth), bound, age_count);
 }
 
 } // namespace Bully
