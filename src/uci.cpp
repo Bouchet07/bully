@@ -218,7 +218,8 @@ bool UCI::execute_line(const std::string& line) {
                     std::string value_keyword;
                     is >> value_keyword; // "value"
                     std::string path_val;
-                    if (is >> path_val) {
+                    std::getline(is >> std::ws, path_val); // Extract rest of line (handles spaces)
+                    if (!path_val.empty()) {
                         Syzygy::init(path_val);
                     }
                 }
@@ -942,11 +943,21 @@ bool UCI::execute_line(const std::string& line) {
                     Syzygy::init("");
                 } else if (sub == "path") {
                     std::string p;
-                    if (is >> p) {
+                    std::getline(is >> std::ws, p);
+                    if (!p.empty()) {
                         Syzygy::init(p);
                     }
                 } else {
-                    Syzygy::init(sub);
+                    std::string rest;
+                    std::getline(is, rest);
+                    std::string full_path = sub + rest;
+                    size_t start = full_path.find_first_not_of(" \t\r\n");
+                    if (start != std::string::npos) full_path = full_path.substr(start);
+                    size_t end = full_path.find_last_not_of(" \t\r\n");
+                    if (end != std::string::npos) full_path = full_path.substr(0, end + 1);
+                    if (!full_path.empty()) {
+                        Syzygy::init(full_path);
+                    }
                 }
             } else {
                 if (is_interactive()) {

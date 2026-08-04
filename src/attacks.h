@@ -25,10 +25,10 @@
 
 namespace Bully {
 
-// Non-sliding attack tables
-extern std::array<Bitboard, SQUARE_NB> KnightAttacks;
-extern std::array<Bitboard, SQUARE_NB> KingAttacks;
-extern std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> PawnAttacks;
+// Non-sliding attack tables (compile-time precomputed)
+extern const std::array<Bitboard, SQUARE_NB> KnightAttacks;
+extern const std::array<Bitboard, SQUARE_NB> KingAttacks;
+extern const std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> PawnAttacks;
 
 // Masks used for occupancy extraction
 extern std::array<Bitboard, SQUARE_NB> RookMasks;

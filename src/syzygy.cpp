@@ -52,7 +52,7 @@ Value probe_wdl(const Position& pos) {
 
     switch (res) {
         case TB_LOSS:
-            return -VALUE_MATE_IN_MAX_PLY;
+            return -VALUE_TB_WIN_IN_MAX_PLY;
         case TB_BLESSED_LOSS:
             return -VALUE_DRAW - 1;
         case TB_DRAW:
@@ -60,7 +60,7 @@ Value probe_wdl(const Position& pos) {
         case TB_CURSED_WIN:
             return VALUE_DRAW + 1;
         case TB_WIN:
-            return VALUE_MATE_IN_MAX_PLY;
+            return VALUE_TB_WIN_IN_MAX_PLY;
         default:
             return VALUE_NONE;
     }

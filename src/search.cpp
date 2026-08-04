@@ -241,9 +241,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     if (ply > 0 && Syzygy::max_cardinality > 0) {
         Value tb_val = Syzygy::probe_wdl(pos);
-        if (tb_val != VALUE_NONE) {
-            return tb_val;
-        }
+        if (tb_val == VALUE_TB_WIN_IN_MAX_PLY) return static_cast<Value>(tb_val - ply);
+        if (tb_val == -VALUE_TB_WIN_IN_MAX_PLY) return static_cast<Value>(tb_val + ply);
+        if (tb_val != VALUE_NONE) return tb_val;
     }
 
     if (ply >= MAX_PLY - 1) {
