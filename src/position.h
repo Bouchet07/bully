@@ -26,11 +26,16 @@ extern std::array<Key, CASTLING_RIGHT_NB>               CastlingKeys;
 extern std::array<Key, SQUARE_NB>                       EnPassantKeys;
 extern Key                                              SideKey;
 
+// Cuckoo table for O(1) repetition detection
+extern std::array<Key, 8192>  CuckooKeys;
+extern std::array<Move, 8192> CuckooMoves;
+
 // Castling rights update mask
 extern std::array<CastlingRights, SQUARE_NB> CastlingRightsMask;
 
-// Initialize Zobrist hashing keys
+// Initialize Zobrist hashing keys and Cuckoo tables
 void init_zobrist();
+void init_cuckoo();
 
 // Descriptor of piece modifications for lazy incremental NNUE updates
 struct DirtyPiece {

@@ -14,8 +14,56 @@ std::array<Key, CASTLING_RIGHT_NB>               CastlingKeys;
 std::array<Key, SQUARE_NB>                       EnPassantKeys;
 Key SideKey;
 
+// Cuckoo table definitions
+std::array<Key, 8192>  CuckooKeys{};
+std::array<Move, 8192> CuckooMoves{};
+
 // Castling rights update mask
 std::array<CastlingRights, SQUARE_NB> CastlingRightsMask;
+
+static inline size_t cuckoo_h1(Key key) { return static_cast<size_t>(key & 0x1FFF); }
+static inline size_t cuckoo_h2(Key key) { return static_cast<size_t>((key >> 16) & 0x1FFF); }
+
+void init_cuckoo() {
+    CuckooKeys.fill(0);
+    CuckooMoves.fill(Move::none());
+
+    for (Piece pc = W_PAWN; pc <= B_KING; ++pc) {
+        if (type_of(pc) == PAWN) continue;
+
+        for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1) {
+            for (Square s2 = static_cast<Square>(to_index(s1) + 1); s2 <= SQ_H8; ++s2) {
+                Bitboard attacks = 0;
+                PieceType pt = type_of(pc);
+                if (pt == KNIGHT) attacks = knight_attacks(s1);
+                else if (pt == BISHOP) attacks = bishop_attacks(s1, 0);
+                else if (pt == ROOK) attacks = rook_attacks(s1, 0);
+                else if (pt == QUEEN) attacks = queen_attacks(s1, 0);
+                else if (pt == KING) attacks = king_attacks(s1);
+
+                if (!(attacks & square_bb(s2))) continue;
+
+                Move move = Move(s1, s2);
+                Key key = PieceKeys[to_index(pc)][to_index(s1)]
+                        ^ PieceKeys[to_index(pc)][to_index(s2)]
+                        ^ SideKey;
+
+                size_t i = cuckoo_h1(key);
+
+                int count = 0;
+                while (count < 64) {
+                    std::swap(CuckooKeys[i], key);
+                    std::swap(CuckooMoves[i], move);
+
+                    if (move == Move::none()) break;
+
+                    i = (i == cuckoo_h1(key)) ? cuckoo_h2(key) : cuckoo_h1(key);
+                    count++;
+                }
+            }
+        }
+    }
+}
 
 void init_zobrist() {
     std::mt19937_64 rng(7821938ULL);
@@ -42,6 +90,8 @@ void init_zobrist() {
     CastlingRightsMask[to_index(SQ_A8)] = static_cast<CastlingRights>(ANY_CASTLING & ~BLACK_OOO);
     CastlingRightsMask[to_index(SQ_H8)] = static_cast<CastlingRights>(ANY_CASTLING & ~BLACK_OO);
     CastlingRightsMask[to_index(SQ_E8)] = static_cast<CastlingRights>(ANY_CASTLING & ~(BLACK_OO | BLACK_OOO));
+
+    init_cuckoo();
 }
 
 void Position::add_piece(Piece pc, Square sq) {

@@ -58,11 +58,18 @@ struct SearchWorker {
 };
 
 static bool is_repetition(const Position& pos) {
+    int rule50 = pos.rule50();
+    if (rule50 < 4) {
+        return false; // Fast O(1) short-circuit: Repetitions require at least 4 plies.
+    }
+
     const StateInfo* state = pos.state();
-    int limit = std::min(pos.rule50(), 100);
-    for (int i = 0; i < limit && state->previous; ++i) {
-        state = state->previous;
-        if (state->key == pos.state()->key) {
+    Key current_key = state->key;
+
+    int limit = std::min(rule50, 100);
+    for (int i = 2; i <= limit && state->previous && state->previous->previous; i += 2) {
+        state = state->previous->previous;
+        if (state->key == current_key) {
             return true;
         }
     }
