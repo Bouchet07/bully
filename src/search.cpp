@@ -166,7 +166,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     return alpha;
 }
 
-static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics, Move prev_move = Move::none()) {
+static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics, Move prev_move = Move::none(), Move prev_move_2 = Move::none()) {
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
     }
@@ -241,7 +241,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             pos.make_null_move(next_si);
             ss.nodes++;
             
-            Value null_score = -pvs(pos, -beta, -beta + 1, depth - 1 - 3, ply + 1, ss, heuristics);
+            Value null_score = -pvs(pos, -beta, -beta + 1, depth - 1 - 3, ply + 1, ss, heuristics, Move::none(), prev_move);
             pos.unmake_null_move();
 
             if (null_score >= beta) {
@@ -258,7 +258,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Value best_score = -VALUE_INFINITE;
     Bound bound_type = BOUND_UPPER;
 
-    MovePicker picker(pos, tt_move, ply, &heuristics, prev_move);
+    MovePicker picker(pos, tt_move, ply, &heuristics, prev_move, prev_move_2);
     Move m;
     while ((m = picker.next_move(pos)) != Move::none()) {
         bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
@@ -299,7 +299,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
         Value score;
         if (legal_moves == 1) {
-            score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics);
+            score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m, prev_move);
         } else {
             int reduction = 0;
             if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !in_check) {
@@ -316,14 +316,14 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 reduction = std::clamp(reduction, 0, depth - 1);
             }
 
-            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction + extension, ply + 1, ss, heuristics, m);
+            score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 - reduction + extension, ply + 1, ss, heuristics, m, prev_move);
 
             if (score > alpha && reduction > 0) {
-                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m);
+                score = -pvs(pos, -(alpha + 1), -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m, prev_move);
             }
 
             if (score > alpha && score < beta) {
-                score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m);
+                score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m, prev_move);
             }
         }
 
@@ -358,29 +358,59 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         if (score >= beta) {
             bound_type = BOUND_LOWER;
             
-            if (!is_cap) {
-                if (use_killers) {
-                    size_t p_idx = static_cast<size_t>(ply);
-                    if (heuristics.killer1[p_idx] != m) {
-                        heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
-                        heuristics.killer1[p_idx] = m;
+            if (use_history) {
+                int bonus = std::clamp(depth * depth, 1, 1024);
+                if (!is_cap) {
+                    if (use_killers) {
+                        size_t p_idx = static_cast<size_t>(ply);
+                        if (heuristics.killer1[p_idx] != m) {
+                            heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
+                            heuristics.killer1[p_idx] = m;
+                        }
+                        if (prev_move.is_ok()) {
+                            heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())] = m;
+                        }
                     }
-                    if (prev_move.is_ok()) {
-                        heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())] = m;
-                    }
-                }
-                if (use_history) {
+
                     Piece pc = pos.piece_on(m.from_sq());
-                    heuristics.history[to_index(pc)][to_index(m.to_sq())] += depth * depth;
+                    heuristics.history[to_index(pc)][to_index(m.to_sq())] += bonus;
+
+                    if (prev_move.is_ok()) {
+                        Piece pc1 = pos.piece_on(prev_move.to_sq());
+                        size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                        if (prev_idx1 < 1024) {
+                            heuristics.cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())] += bonus;
+                        }
+                    }
+
+                    if (prev_move_2.is_ok()) {
+                        Piece pc2 = pos.piece_on(prev_move_2.to_sq());
+                        size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                        if (prev_idx2 < 1024) {
+                            heuristics.cont_history_2[prev_idx2][to_index(pc2)][to_index(m.to_sq())] += bonus;
+                        }
+                    }
 
                     // Penalize other quiet moves that failed to cause a cutoff
                     for (int q = 0; q < quiet_count; ++q) {
                         Move qm = quiet_moves[static_cast<size_t>(q)];
                         if (qm != m) {
                             Piece qpc = pos.piece_on(qm.from_sq());
-                            heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= depth * depth;
+                            heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+
+                            if (prev_move.is_ok()) {
+                                Piece pc1 = pos.piece_on(prev_move.to_sq());
+                                size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                                if (prev_idx1 < 1024) {
+                                    heuristics.cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+                                }
+                            }
                         }
                     }
+                } else {
+                    Piece pc = pos.piece_on(m.from_sq());
+                    PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
+                    heuristics.capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)] += bonus;
                 }
             }
             break;

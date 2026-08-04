@@ -4,41 +4,67 @@
 
 namespace Bully {
 
-MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move)
-    : tt_move_(tt_move), ply_(ply), heuristics_(heuristics), prev_move_(prev_move), stage_(Stage::MAIN_TT) {
+MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move, Move prev_move_2)
+    : tt_move_(tt_move), ply_(ply), heuristics_(heuristics), prev_move_(prev_move), prev_move_2_(prev_move_2), stage_(Stage::MAIN_TT) {
     if (!tt_move_.is_ok() || !pos.legal(tt_move_)) {
         tt_move_ = Move::none();
         stage_ = Stage::CAPTURE_INIT;
     }
 }
 
-static inline int score_move_picker(Move m, Move tt_move, Move prev_move, const Position& pos, int ply, const Search::Heuristics* heuristics, Value& out_see) {
+static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move prev_move_2, const Position& pos, int ply, const Search::Heuristics* heuristics, Value& out_see) {
     out_see = VALUE_NONE;
     if (m == tt_move) return 1000000;
+
+    Piece pc = pos.piece_on(m.from_sq());
+    PieceType pt = type_of(pc);
 
     bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
     if (is_cap) {
         out_see = pos.see(m);
-        if (out_see < 0) {
-            return 10000 + out_see;
-        }
         PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
-        PieceType attacker_pt = type_of(pos.piece_on(m.from_sq()));
-        return 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(attacker_pt);
+        
+        int cap_hist = 0;
+        if (heuristics && Search::config.history) {
+            cap_hist = heuristics->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)] / 32;
+        }
+
+        if (out_see < 0) {
+            return 10000 + out_see + cap_hist;
+        }
+        return 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(pt) + cap_hist;
     }
+
+    int score = 0;
 
     if (heuristics && Search::config.killers) {
         size_t ply_idx = to_index(ply);
         if (m == heuristics->killer1[ply_idx]) return 80000;
         if (m == heuristics->killer2[ply_idx]) return 70000;
-        if (prev_move.is_ok() && m == heuristics->countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())]) return 65000;
+        if (prev_move.is_ok() && m == heuristics->countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())]) score += 65000;
     }
 
     if (heuristics && Search::config.history) {
-        Piece pc = pos.piece_on(m.from_sq());
-        return heuristics->history[to_index(pc)][to_index(m.to_sq())];
+        score += heuristics->history[to_index(pc)][to_index(m.to_sq())];
+
+        if (prev_move.is_ok()) {
+            Piece pc1 = pos.piece_on(prev_move.to_sq());
+            size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+            if (prev_idx1 < 1024) {
+                score += heuristics->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())];
+            }
+        }
+
+        if (prev_move_2.is_ok()) {
+            Piece pc2 = pos.piece_on(prev_move_2.to_sq());
+            size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+            if (prev_idx2 < 1024) {
+                score += heuristics->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())];
+            }
+        }
     }
-    return 0;
+
+    return score;
 }
 
 Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
@@ -52,7 +78,7 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
             case Stage::CAPTURE_INIT: {
                 list_.generate_captures(pos);
                 for (size_t i = 0; i < list_.size(); ++i) {
-                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, pos, ply_, heuristics_, list_[i].see_score);
+                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, prev_move_2_, pos, ply_, heuristics_, list_[i].see_score);
                 }
                 current_idx_ = 0;
                 stage_ = Stage::GOOD_CAPTURES;
@@ -89,7 +115,7 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
                 }
                 list_.generate_quiets(pos);
                 for (size_t i = 0; i < list_.size(); ++i) {
-                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, pos, ply_, heuristics_, list_[i].see_score);
+                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, prev_move_2_, pos, ply_, heuristics_, list_[i].see_score);
                 }
                 current_idx_ = 0;
                 stage_ = Stage::QUIETS;

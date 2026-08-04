@@ -36,7 +36,7 @@ enum class Stage : uint8_t {
 
 class MovePicker {
 public:
-    MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move);
+    MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move, Move prev_move_2 = Move::none());
 
     // Yields the next best move in order, or Move::none() when moves are exhausted
     [[nodiscard]] Move next_move(const Position& pos, bool skip_quiets = false);
@@ -46,6 +46,7 @@ private:
     int ply_ = 0;
     const Search::Heuristics* heuristics_ = nullptr;
     Move prev_move_ = Move::none();
+    Move prev_move_2_ = Move::none();
     Stage stage_ = Stage::MAIN_TT;
 
     MoveList list_;
