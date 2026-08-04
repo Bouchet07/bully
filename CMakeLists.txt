@@ -22,6 +22,7 @@ set(ENGINE_SOURCES
     src/attacks.cpp
     src/position.cpp
     src/movegen.cpp
+    src/movepicker.cpp
     src/tt.cpp
     src/search.cpp
     src/evaluation.cpp
@@ -38,6 +39,7 @@ set(ENGINE_HEADERS
     src/attacks.h
     src/position.h
     src/movegen.h
+    src/movepicker.h
     src/tt.h
     src/search.h
     src/evaluation.h

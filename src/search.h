@@ -65,6 +65,22 @@ inline bool& use_tt = config.tt;
 inline bool& use_killers = config.killers;
 inline bool& use_history = config.history;
 
+// Quiet Move Ordering heuristic tables local to each search thread
+struct Heuristics {
+    std::array<Move, MAX_PLY> killer1 = {Move::none()};
+    std::array<Move, MAX_PLY> killer2 = {Move::none()};
+    std::array<std::array<Move, 64>, 64> countermoves = {};
+    // [PieceType][ToSquare]
+    std::array<std::array<int, 64>, 16> history = {{{0}}};
+
+    void clear() {
+        killer1.fill(Move::none());
+        killer2.fill(Move::none());
+        for (auto& row : countermoves) row.fill(Move::none());
+        for (auto& row : history) row.fill(0);
+    }
+};
+
 // Statistics and timing tracking for the active search
 struct SearchState {
     Limits limits;

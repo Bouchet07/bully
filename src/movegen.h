@@ -26,6 +26,12 @@ struct ExtMove {
     constexpr bool operator<(const ExtMove& other) const { return value > other.value; } // Descending sort
 };
 
+enum GenType {
+    GEN_ALL,
+    GEN_CAPTURES,
+    GEN_QUIETS
+};
+
 // Lightweight move list container with zero heap allocations
 class MoveList {
 public:
@@ -37,8 +43,11 @@ public:
     // Generate all strictly legal moves for a position
     void generate_legal(const Position& pos);
 
-    // Generate only pseudo-legal captures (used for Quiescence Search)
+    // Generate only pseudo-legal captures (used for Quiescence Search & MovePicker)
     void generate_captures(const Position& pos);
+
+    // Generate only pseudo-legal non-captures (used in MovePicker)
+    void generate_quiets(const Position& pos);
 
     // Iterators for range-based for loops
     [[nodiscard]] const ExtMove* begin() const { return list.data(); }

@@ -11,6 +11,7 @@
 #include "search.h"
 #include "tt.h"
 #include "movegen.h"
+#include "movepicker.h"
 #include "bitboard.h"
 #include "evaluation.h"
 #include "syzygy.h"
@@ -45,22 +46,6 @@ struct SearchInitializer {
         }
     }
 } search_initializer;
-
-// Quiet Move Ordering heuristic tables local to each search thread
-struct Heuristics {
-    std::array<Move, MAX_PLY> killer1 = {Move::none()};
-    std::array<Move, MAX_PLY> killer2 = {Move::none()};
-    std::array<std::array<Move, 64>, 64> countermoves = {};
-    // [PieceType][ToSquare]
-    std::array<std::array<int, 64>, 16> history = {{{0}}};
-
-    void clear() {
-        killer1.fill(Move::none());
-        killer2.fill(Move::none());
-        for (auto& row : countermoves) row.fill(Move::none());
-        for (auto& row : history) row.fill(0);
-    }
-};
 
 // Thread Worker structure
 struct SearchWorker {
@@ -109,33 +94,7 @@ void SearchState::check_limits() {
     }
 }
 
-static int score_move(Move m, Move tt_move, Move prev_move, const Position& pos, int ply, const Heuristics& heuristics, Value& out_see) {
-    out_see = VALUE_NONE;
-    if (m == tt_move) return 1000000;
 
-    bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
-    if (is_cap) {
-        out_see = pos.see(m);
-        if (out_see < 0) {
-            return 10000 + out_see; // Sort below killers and history
-        }
-        PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
-        PieceType attacker_pt = type_of(pos.piece_on(m.from_sq()));
-        return 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(attacker_pt);
-    }
-
-    if (use_killers) {
-        if (m == heuristics.killer1[static_cast<size_t>(ply)]) return 80000;
-        if (m == heuristics.killer2[static_cast<size_t>(ply)]) return 70000;
-        if (prev_move.is_ok() && m == heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())]) return 65000;
-    }
-
-    if (use_history) {
-        Piece pc = pos.piece_on(m.from_sq());
-        return heuristics.history[to_index(pc)][to_index(m.to_sq())];
-    }
-    return 0;
-}
 
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
     if ((ss.nodes & 1023) == 0) {
@@ -169,35 +128,10 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
         }
     }
 
-    MoveList& list = ss.move_list[to_index(ply)];
-    if (in_check) {
-        list.generate(pos);
-    } else {
-        list.generate_captures(pos);
-    }
-
-    for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, Move::none(), Move::none(), pos, ply, heuristics, list[i].see_score);
-    }
-
     int legal_moves = 0;
-    for (size_t i = 0; i < list.size(); ++i) {
-        // Selection sort: find the best move from index i to end
-        size_t best_idx = i;
-        for (size_t j = i + 1; j < list.size(); ++j) {
-            if (list[j].value > list[best_idx].value) {
-                best_idx = j;
-            }
-        }
-        std::swap(list[i], list[best_idx]);
-
-        Move m = list[i].move;
-
-        // SEE Pruning: skip losing captures when not in check (cached SEE score)
-        if (!in_check && list[i].see_score < 0) {
-            continue;
-        }
-
+    MovePicker picker(pos, Move::none(), ply, &heuristics, Move::none());
+    Move m;
+    while ((m = picker.next_move(pos, !in_check)) != Move::none()) {
         StateInfo next_si;
         if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
             next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
@@ -309,13 +243,6 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
-    MoveList& list = ss.move_list[to_index(ply)];
-    list.generate(pos);
-
-    for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, tt_move, prev_move, pos, ply, heuristics, list[i].see_score);
-    }
-
     int legal_moves = 0;
     int quiet_moves_searched = 0;
     std::array<Move, 64> quiet_moves;
@@ -324,18 +251,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Value best_score = -VALUE_INFINITE;
     Bound bound_type = BOUND_UPPER;
 
-    for (size_t i = 0; i < list.size(); ++i) {
-        // Selection sort: find the best move from index i to end
-        size_t best_idx = i;
-        for (size_t j = i + 1; j < list.size(); ++j) {
-            if (list[j].value > list[best_idx].value) {
-                best_idx = j;
-            }
-        }
-        std::swap(list[i], list[best_idx]);
-
-        Move m = list[i].move;
-        
+    MovePicker picker(pos, tt_move, ply, &heuristics, prev_move);
+    Move m;
+    while ((m = picker.next_move(pos)) != Move::none()) {
         bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
         if (!is_cap) {
             quiet_moves_searched++;
