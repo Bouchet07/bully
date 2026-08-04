@@ -35,17 +35,35 @@ extern std::atomic<bool> pondering;
 extern std::atomic<int64_t> search_start_time_ms;
 extern int num_threads;
 extern int multipv_count;
-extern bool use_nmp;
-extern bool use_lmr;
-extern bool use_rfp;
-extern bool use_lmp;
-extern bool use_fp;
-extern bool use_check_extensions;
-extern bool use_aspiration_window;
-extern bool use_quiescence;
-extern bool use_tt;
-extern bool use_killers;
-extern bool use_history;
+// Search Configuration Options
+struct SearchConfig {
+    bool nmp = true;
+    bool lmr = true;
+    bool rfp = true;
+    bool lmp = true;
+    bool fp = true;
+    bool check_extensions = true;
+    bool aspiration_window = true;
+    bool quiescence = true;
+    bool tt = true;
+    bool killers = true;
+    bool history = true;
+};
+
+extern SearchConfig config;
+
+// Backward-compatibility references
+inline bool& use_nmp = config.nmp;
+inline bool& use_lmr = config.lmr;
+inline bool& use_rfp = config.rfp;
+inline bool& use_lmp = config.lmp;
+inline bool& use_fp = config.fp;
+inline bool& use_check_extensions = config.check_extensions;
+inline bool& use_aspiration_window = config.aspiration_window;
+inline bool& use_quiescence = config.quiescence;
+inline bool& use_tt = config.tt;
+inline bool& use_killers = config.killers;
+inline bool& use_history = config.history;
 
 // Statistics and timing tracking for the active search
 struct SearchState {
@@ -54,6 +72,7 @@ struct SearchState {
     int seldepth = 0;
     int time_limit = -1;  // Calculated optimal search time (ms)
     int thread_id = 0;    // Thread ID (0 = main thread, >0 = helper threads)
+    NNUE::Accumulator* accumulators = nullptr; // Pointer to worker accumulators array
     
     // Triangular PV Table
     std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table{};

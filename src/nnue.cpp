@@ -48,15 +48,15 @@ struct NetworkWeights {
 static inline void vec_add(int16_t* acc, const int16_t* weights) {
 #if defined(USE_AVX512)
     for (int i = 0; i < 8; ++i) {
-        __m512i a = _mm512_load_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
-        __m512i w = _mm512_load_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
-        _mm512_store_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_add_epi16(a, w));
+        __m512i a = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
+        __m512i w = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
+        _mm512_storeu_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_add_epi16(a, w));
     }
 #elif defined(USE_AVX2)
     for (int i = 0; i < 16; ++i) {
-        __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
-        __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_add_epi16(a, w));
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
+        __m256i w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_add_epi16(a, w));
     }
 #elif defined(USE_NEON)
     for (int i = 0; i < 32; ++i) {
@@ -75,15 +75,15 @@ static inline void vec_add(int16_t* acc, const int16_t* weights) {
 static inline void vec_sub(int16_t* acc, const int16_t* weights) {
 #if defined(USE_AVX512)
     for (int i = 0; i < 8; ++i) {
-        __m512i a = _mm512_load_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
-        __m512i w = _mm512_load_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
-        _mm512_store_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_sub_epi16(a, w));
+        __m512i a = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
+        __m512i w = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
+        _mm512_storeu_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_sub_epi16(a, w));
     }
 #elif defined(USE_AVX2)
     for (int i = 0; i < 16; ++i) {
-        __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
-        __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
-        _mm256_store_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_sub_epi16(a, w));
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
+        __m256i w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_sub_epi16(a, w));
     }
 #elif defined(USE_NEON)
     for (int i = 0; i < 32; ++i) {

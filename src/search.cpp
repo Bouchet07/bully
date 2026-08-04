@@ -25,17 +25,7 @@ std::atomic<int64_t> search_start_time_ms(0);
 std::atomic<uint64_t> last_search_nodes(0);
 int num_threads = 1;
 int multipv_count = 1;
-bool use_nmp = true;
-bool use_lmr = true;
-bool use_rfp = true;
-bool use_lmp = true;
-bool use_fp = true;
-bool use_check_extensions = true;
-bool use_aspiration_window = true;
-bool use_quiescence = true;
-bool use_tt = true;
-bool use_killers = true;
-bool use_history = true;
+SearchConfig config;
 static std::thread controller_thread;
 
 // LMR reductions table
@@ -77,6 +67,7 @@ struct SearchWorker {
     int id = 0;
     Position pos;
     std::vector<StateInfo> history_stack;
+    std::array<NNUE::Accumulator, MAX_PLY> accumulators;
     SearchState ss;
     Heuristics heuristics;
 };
@@ -118,18 +109,19 @@ void SearchState::check_limits() {
     }
 }
 
-static int score_move(Move m, Move tt_move, Move prev_move, const Position& pos, int ply, const Heuristics& heuristics) {
+static int score_move(Move m, Move tt_move, Move prev_move, const Position& pos, int ply, const Heuristics& heuristics, Value& out_see) {
+    out_see = VALUE_NONE;
     if (m == tt_move) return 1000000;
 
     bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
     if (is_cap) {
-        Value see_val = pos.see(m);
-        if (see_val < 0) {
-            return 10000 + see_val; // Sort below killers and history
+        out_see = pos.see(m);
+        if (out_see < 0) {
+            return 10000 + out_see; // Sort below killers and history
         }
-        Piece victim = (m.type_of() == EN_PASSANT) ? make_piece(~pos.side_to_move(), PAWN) : pos.piece_on(m.to_sq());
-        Piece attacker = pos.piece_on(m.from_sq());
-        return 900000 + get_piece_value(type_of(victim)) * 10 - get_piece_value(type_of(attacker));
+        PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
+        PieceType attacker_pt = type_of(pos.piece_on(m.from_sq()));
+        return 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(attacker_pt);
     }
 
     if (use_killers) {
@@ -185,7 +177,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     }
 
     for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, Move::none(), Move::none(), pos, ply, heuristics);
+        list[i].value = score_move(list[i].move, Move::none(), Move::none(), pos, ply, heuristics, list[i].see_score);
     }
 
     int legal_moves = 0;
@@ -201,12 +193,15 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 
         Move m = list[i].move;
 
-        // SEE Pruning: skip losing captures when not in check
-        if (!in_check && pos.see(m) < 0) {
+        // SEE Pruning: skip losing captures when not in check (cached SEE score)
+        if (!in_check && list[i].see_score < 0) {
             continue;
         }
 
         StateInfo next_si;
+        if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
+            next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
+        }
         if (!pos.make_move(m, next_si)) {
             continue;
         }
@@ -318,7 +313,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     list.generate(pos);
 
     for (size_t i = 0; i < list.size(); ++i) {
-        list[i].value = score_move(list[i].move, tt_move, prev_move, pos, ply, heuristics);
+        list[i].value = score_move(list[i].move, tt_move, prev_move, pos, ply, heuristics, list[i].see_score);
     }
 
     int legal_moves = 0;
@@ -363,6 +358,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
 
         StateInfo next_si;
+        if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
+            next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
+        }
         if (!pos.make_move(m, next_si)) {
             continue;
         }
@@ -570,11 +568,13 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         w->ss.limits = limits;
         w->ss.thread_id = i;
         w->ss.time_limit = time_limit;
+        w->ss.accumulators = w->accumulators.data();
         
         // Clone stack history
         w->history_stack.clear();
         if (history_copy.empty()) {
             w->history_stack.emplace_back();
+            w->history_stack.back().accumulator = &w->accumulators[0];
             w->pos.set_fen(pos.get_fen(), w->history_stack.back());
         } else {
             w->history_stack.reserve(history_copy.size());
@@ -583,7 +583,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             }
             for (size_t k = 0; k < w->history_stack.size(); ++k) {
                 w->history_stack[k].previous = (k == 0) ? nullptr : &w->history_stack[k-1];
-                w->history_stack[k].accumulator = nullptr;
+                w->history_stack[k].accumulator = (k < MAX_PLY) ? &w->accumulators[k] : nullptr;
             }
             w->pos = pos;
             w->pos.set_state_pointer(&w->history_stack.back());

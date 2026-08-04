@@ -123,7 +123,7 @@ void print_interactive_help() {
               << "             : Print move-by-move node counts (divide test).\n";
     std::cout << "  " << style.yellow << "bench" << style.reset << " ["
               << style.magenta << "<depth>" << style.reset
-              << "]                : Run standard search benchmark suite.\n";
+              << "]            : Run standard search benchmark suite.\n";
     std::cout << "  " << style.yellow << "hash" << style.reset << " "
               << style.magenta << "<MB>" << style.reset
               << "                  : Resize transposition table (in Megabytes).\n";
@@ -197,7 +197,7 @@ void print_interactive_options() {
               << style.magenta << (Search::use_killers ? "ON" : "OFF") << style.reset << "\n";
     std::cout << "  " << style.green << "HistoryHeuristic" << style.reset << " (" << style.magenta << "hh" << style.reset << ")          : "
               << style.magenta << (Search::use_history ? "ON" : "OFF") << style.reset << "\n";
-    std::cout << "  " << style.green << "UseNNUE" << style.reset << " (" << style.magenta << "nnue" << style.reset << ")                    : "
+    std::cout << "  " << style.green << "UseNNUE" << style.reset << " (" << style.magenta << "nnue" << style.reset << ")                 : "
               << style.magenta << (NNUE::use_nnue ? "ON" : "OFF") << style.reset << "\n\n";
     std::cout << "  " << style.green << "Usage" << style.reset << ": "
               << style.yellow << "options" << style.reset << " [" << style.magenta << "name" << style.reset << " [" << style.green << "on" << style.reset << " | " << style.green << "off" << style.reset << "]]"

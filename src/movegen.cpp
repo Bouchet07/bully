@@ -184,34 +184,31 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
 
     if constexpr (!CapturesOnly) {
         if (!pos.in_check()) {
+            Bitboard occ = pos.occupied();
             if constexpr (Us == WHITE) {
-                if (pos.castling_rights() & WHITE_OO) {
-                    if (pos.piece_on(SQ_F1) == NO_PIECE && pos.piece_on(SQ_G1) == NO_PIECE) {
-                        if (!pos.attacked(SQ_F1, BLACK) && !pos.attacked(SQ_G1, BLACK)) {
-                            *list++ = ExtMove{Move::make<CASTLING>(SQ_E1, SQ_G1), 0};
-                        }
+                constexpr Bitboard WHITE_OO_MASK  = square_bb(SQ_F1) | square_bb(SQ_G1);
+                constexpr Bitboard WHITE_OOO_MASK = square_bb(SQ_B1) | square_bb(SQ_C1) | square_bb(SQ_D1);
+                if ((pos.castling_rights() & WHITE_OO) && !(occ & WHITE_OO_MASK)) {
+                    if (!pos.attacked(SQ_F1, BLACK) && !pos.attacked(SQ_G1, BLACK)) {
+                        *list++ = ExtMove{Move::make<CASTLING>(SQ_E1, SQ_G1), 0};
                     }
                 }
-                if (pos.castling_rights() & WHITE_OOO) {
-                    if (pos.piece_on(SQ_B1) == NO_PIECE && pos.piece_on(SQ_C1) == NO_PIECE && pos.piece_on(SQ_D1) == NO_PIECE) {
-                        if (!pos.attacked(SQ_C1, BLACK) && !pos.attacked(SQ_D1, BLACK)) {
-                            *list++ = ExtMove{Move::make<CASTLING>(SQ_E1, SQ_C1), 0};
-                        }
+                if ((pos.castling_rights() & WHITE_OOO) && !(occ & WHITE_OOO_MASK)) {
+                    if (!pos.attacked(SQ_C1, BLACK) && !pos.attacked(SQ_D1, BLACK)) {
+                        *list++ = ExtMove{Move::make<CASTLING>(SQ_E1, SQ_C1), 0};
                     }
                 }
             } else {
-                if (pos.castling_rights() & BLACK_OO) {
-                    if (pos.piece_on(SQ_F8) == NO_PIECE && pos.piece_on(SQ_G8) == NO_PIECE) {
-                        if (!pos.attacked(SQ_F8, WHITE) && !pos.attacked(SQ_G8, WHITE)) {
-                            *list++ = ExtMove{Move::make<CASTLING>(SQ_E8, SQ_G8), 0};
-                        }
+                constexpr Bitboard BLACK_OO_MASK  = square_bb(SQ_F8) | square_bb(SQ_G8);
+                constexpr Bitboard BLACK_OOO_MASK = square_bb(SQ_B8) | square_bb(SQ_C8) | square_bb(SQ_D8);
+                if ((pos.castling_rights() & BLACK_OO) && !(occ & BLACK_OO_MASK)) {
+                    if (!pos.attacked(SQ_F8, WHITE) && !pos.attacked(SQ_G8, WHITE)) {
+                        *list++ = ExtMove{Move::make<CASTLING>(SQ_E8, SQ_G8), 0};
                     }
                 }
-                if (pos.castling_rights() & BLACK_OOO) {
-                    if (pos.piece_on(SQ_B8) == NO_PIECE && pos.piece_on(SQ_C8) == NO_PIECE && pos.piece_on(SQ_D8) == NO_PIECE) {
-                        if (!pos.attacked(SQ_C8, WHITE) && !pos.attacked(SQ_D8, WHITE)) {
-                            *list++ = ExtMove{Move::make<CASTLING>(SQ_E8, SQ_C8), 0};
-                        }
+                if ((pos.castling_rights() & BLACK_OOO) && !(occ & BLACK_OOO_MASK)) {
+                    if (!pos.attacked(SQ_C8, WHITE) && !pos.attacked(SQ_D8, WHITE)) {
+                        *list++ = ExtMove{Move::make<CASTLING>(SQ_E8, SQ_C8), 0};
                     }
                 }
             }
