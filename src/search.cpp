@@ -173,6 +173,9 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     MovePicker picker(pos, Move::none(), ply, &heuristics, Move::none(), Move::none(), ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos, !in_check)) != Move::none()) {
+        if (!in_check && pos.see(m) < 0) {
+            continue;
+        }
         StateInfo next_si;
         if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
             next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
