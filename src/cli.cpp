@@ -187,6 +187,8 @@ void print_interactive_options() {
               << style.magenta << (Search::use_fp ? "ON" : "OFF") << style.reset << "\n";
     std::cout << "  " << style.green << "CheckExtensions" << style.reset << " (" << style.magenta << "ce" << style.reset << ")           : "
               << style.magenta << (Search::use_check_extensions ? "ON" : "OFF") << style.reset << "\n";
+    std::cout << "  " << style.green << "SingularExtensions" << style.reset << " (" << style.magenta << "se" << style.reset << ")        : "
+              << style.magenta << (Search::use_singular_extensions ? "ON" : "OFF") << style.reset << "\n";
     std::cout << "  " << style.green << "AspirationWindow" << style.reset << " (" << style.magenta << "aw" << style.reset << ")          : "
               << style.magenta << (Search::use_aspiration_window ? "ON" : "OFF") << style.reset << "\n";
     std::cout << "  " << style.green << "QuiescenceSearch" << style.reset << " (" << style.magenta << "qs" << style.reset << ")          : "
@@ -213,6 +215,7 @@ void print_plain_options() {
     std::cout << "  LateMovePruning (lmp)          : " << (Search::use_lmp ? "ON" : "OFF") << "\n";
     std::cout << "  FutilityPruning (fp)           : " << (Search::use_fp ? "ON" : "OFF") << "\n";
     std::cout << "  CheckExtensions (ce)           : " << (Search::use_check_extensions ? "ON" : "OFF") << "\n";
+    std::cout << "  SingularExtensions (se)        : " << (Search::use_singular_extensions ? "ON" : "OFF") << "\n";
     std::cout << "  AspirationWindow (aw)          : " << (Search::use_aspiration_window ? "ON" : "OFF") << "\n";
     std::cout << "  QuiescenceSearch (qs)          : " << (Search::use_quiescence ? "ON" : "OFF") << "\n";
     std::cout << "  UseTT (tt)                     : " << (Search::use_tt ? "ON" : "OFF") << "\n";

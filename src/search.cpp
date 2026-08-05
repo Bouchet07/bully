@@ -242,7 +242,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Bound tt_bound = BOUND_NONE;
 
     if (use_tt && TT.probe(pos.key(), tt_move, tt_score, tt_eval, tt_depth, tt_bound, ply)) {
-        if (tt_depth >= depth) {
+        if (tt_depth >= depth && !ss.singular_search) {
             if (tt_bound == BOUND_EXACT) return tt_score;
             if (tt_bound == BOUND_UPPER && tt_score <= alpha) return alpha;
             if (tt_bound == BOUND_LOWER && tt_score >= beta) return beta;
@@ -252,6 +252,36 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Color us = pos.side_to_move();
     bool in_check = pos.in_check();
     int extension = (use_check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
+
+    if (use_singular_extensions
+        && extension == 0
+        && ply > 0
+        && depth >= 7
+        && tt_move.is_ok()
+        && tt_depth >= depth - 3
+        && (tt_bound == BOUND_LOWER || tt_bound == BOUND_EXACT)
+        && std::abs(tt_score) < VALUE_MATE_IN_MAX_PLY
+        && !ss.singular_search) {
+
+        int singular_margin = depth * 2;
+        Value singular_beta = static_cast<Value>(tt_score - singular_margin);
+        int singular_depth = (depth - 1) / 2;
+
+        Move saved_excluded = ss.excluded_move;
+        bool saved_singular = ss.singular_search;
+
+        ss.excluded_move = tt_move;
+        ss.singular_search = true;
+
+        Value singular_score = pvs(pos, singular_beta - 1, singular_beta, singular_depth, ply, ss, heuristics, prev_move, prev_move_2);
+
+        ss.excluded_move = saved_excluded;
+        ss.singular_search = saved_singular;
+
+        if (singular_score < singular_beta) {
+            extension = 1;
+        }
+    }
 
     Value static_eval = evaluate_position(pos, ss);
 
@@ -297,6 +327,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     MovePicker picker(pos, tt_move, ply, &heuristics, prev_move, prev_move_2, ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos)) != Move::none()) {
+        if (m == ss.excluded_move) {
+            continue;
+        }
         bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
         if (!is_cap) {
             quiet_moves_searched++;

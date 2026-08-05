@@ -43,6 +43,7 @@ struct SearchConfig {
     bool lmp = true;
     bool fp = true;
     bool check_extensions = true;
+    bool singular_extensions = true;
     bool aspiration_window = true;
     bool quiescence = true;
     bool tt = true;
@@ -59,6 +60,7 @@ inline bool& use_rfp = config.rfp;
 inline bool& use_lmp = config.lmp;
 inline bool& use_fp = config.fp;
 inline bool& use_check_extensions = config.check_extensions;
+inline bool& use_singular_extensions = config.singular_extensions;
 inline bool& use_aspiration_window = config.aspiration_window;
 inline bool& use_quiescence = config.quiescence;
 inline bool& use_tt = config.tt;
@@ -174,6 +176,10 @@ struct SearchState {
     // Heap-allocated per-ply MoveList array to eliminate function call stack bloat
     std::array<MoveList, MAX_PLY> move_list{};
     std::array<std::array<ExtMove, MAX_MOVES>, MAX_PLY> bad_captures{};
+
+    // Singular Extension Tracking
+    Move excluded_move = Move::none();
+    bool singular_search = false;
 
     // Check if we should abort the search (e.g. time limit reached)
     void check_limits();

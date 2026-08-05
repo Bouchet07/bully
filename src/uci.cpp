@@ -326,6 +326,17 @@ bool UCI::execute_line(const std::string& line) {
                         }
                     }
                 }
+                else if (option_name == "SingularExtensions") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        Search::use_singular_extensions = (val == "true");
+                        if (is_interactive()) {
+                            std::cout << std::format("SingularExtensions set to {}.\n", Search::use_singular_extensions);
+                        }
+                    }
+                }
                 else if (option_name == "AspirationWindow") {
                     std::string value_keyword;
                     is >> value_keyword; // "value"
@@ -836,6 +847,7 @@ bool UCI::execute_line(const std::string& line) {
                         else if (opt_name == "lmp") Search::use_lmp = enabled;
                         else if (opt_name == "fp")  Search::use_fp  = enabled;
                         else if (opt_name == "ce")  Search::use_check_extensions = enabled;
+                        else if (opt_name == "se")  Search::use_singular_extensions = enabled;
                         else if (opt_name == "aw")  Search::use_aspiration_window = enabled;
                         else if (opt_name == "qs")  Search::use_quiescence = enabled;
                         else if (opt_name == "tt")  Search::use_tt = enabled;
@@ -869,6 +881,7 @@ bool UCI::execute_line(const std::string& line) {
                     else if (opt_name == "lmp") enabled = Search::use_lmp;
                     else if (opt_name == "fp")  enabled = Search::use_fp;
                     else if (opt_name == "ce")  enabled = Search::use_check_extensions;
+                    else if (opt_name == "se")  enabled = Search::use_singular_extensions;
                     else if (opt_name == "aw")  enabled = Search::use_aspiration_window;
                     else if (opt_name == "qs")  enabled = Search::use_quiescence;
                     else if (opt_name == "tt")  enabled = Search::use_tt;
