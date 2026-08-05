@@ -169,7 +169,8 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
     }
 
     int legal_moves = 0;
-    MovePicker picker(pos, Move::none(), ply, &heuristics, Move::none());
+    size_t p_idx = to_index(ply);
+    MovePicker picker(pos, Move::none(), ply, &heuristics, Move::none(), Move::none(), ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos, !in_check)) != Move::none()) {
         StateInfo next_si;
@@ -292,7 +293,8 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Value best_score = -VALUE_INFINITE;
     Bound bound_type = BOUND_UPPER;
 
-    MovePicker picker(pos, tt_move, ply, &heuristics, prev_move, prev_move_2);
+    size_t p_idx = to_index(ply);
+    MovePicker picker(pos, tt_move, ply, &heuristics, prev_move, prev_move_2, ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos)) != Move::none()) {
         bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
@@ -396,10 +398,10 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 int bonus = std::clamp(depth * depth, 1, 1024);
                 if (!is_cap) {
                     if (use_killers) {
-                        size_t p_idx = static_cast<size_t>(ply);
-                        if (heuristics.killer1[p_idx] != m) {
-                            heuristics.killer2[p_idx] = heuristics.killer1[p_idx];
-                            heuristics.killer1[p_idx] = m;
+                        size_t k_idx = static_cast<size_t>(ply);
+                        if (heuristics.killer1[k_idx] != m) {
+                            heuristics.killer2[k_idx] = heuristics.killer1[k_idx];
+                            heuristics.killer1[k_idx] = m;
                         }
                         if (prev_move.is_ok()) {
                             heuristics.countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())] = m;

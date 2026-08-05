@@ -4,8 +4,11 @@
 
 namespace Bully {
 
-MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move, Move prev_move_2)
-    : tt_move_(tt_move), ply_(ply), heuristics_(heuristics), prev_move_(prev_move), prev_move_2_(prev_move_2), stage_(Stage::MAIN_TT) {
+MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search::Heuristics* heuristics, Move prev_move, Move prev_move_2, MoveList& list_ref, std::array<ExtMove, MAX_MOVES>& bad_caps_ref)
+    : tt_move_(tt_move), ply_(ply), heuristics_(heuristics), prev_move_(prev_move), prev_move_2_(prev_move_2), stage_(Stage::MAIN_TT), list_(list_ref), bad_captures_(bad_caps_ref) {
+    list_.clear();
+    bad_capture_count_ = 0;
+    bad_capture_idx_ = 0;
     if (!tt_move_.is_ok() || !pos.legal(tt_move_)) {
         tt_move_ = Move::none();
         stage_ = Stage::CAPTURE_INIT;

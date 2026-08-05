@@ -58,6 +58,7 @@ public:
     
     [[nodiscard]] size_t size() const { return static_cast<size_t>(last - list.data()); }
     [[nodiscard]] bool empty() const { return last == list.data(); }
+    void clear() { last = list.data(); }
 
     [[nodiscard]] const ExtMove& operator[](size_t index) const { return list[index]; }
     [[nodiscard]] ExtMove& operator[](size_t index) { return list[index]; }

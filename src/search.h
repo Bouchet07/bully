@@ -140,6 +140,7 @@ struct SearchState {
 
     // Heap-allocated per-ply MoveList array to eliminate function call stack bloat
     std::array<MoveList, MAX_PLY> move_list{};
+    std::array<std::array<ExtMove, MAX_MOVES>, MAX_PLY> bad_captures{};
 
     // Check if we should abort the search (e.g. time limit reached)
     void check_limits();
