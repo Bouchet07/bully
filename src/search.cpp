@@ -409,51 +409,53 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                     }
 
                     Piece pc = pos.piece_on(m.from_sq());
-                    heuristics.history[to_index(pc)][to_index(m.to_sq())] += bonus;
+                    if (heuristics.shared) {
+                        heuristics.shared->history[to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
 
-                    if (prev_move.is_ok()) {
-                        Piece pc1 = pos.piece_on(prev_move.to_sq());
-                        if (pc1 != NO_PIECE) {
-                            size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
-                            if (prev_idx1 < 1024) {
-                                heuristics.cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())] += bonus;
-                            }
-                        }
-                    }
-
-                    if (prev_move_2.is_ok()) {
-                        Piece pc2 = pos.piece_on(prev_move_2.to_sq());
-                        if (pc2 != NO_PIECE) {
-                            size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
-                            if (prev_idx2 < 1024) {
-                                heuristics.cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())] += bonus;
-                            }
-                        }
-                    }
-
-                    // Penalize other quiet moves that failed to cause a cutoff
-                    for (int q = 0; q < quiet_count; ++q) {
-                        Move qm = quiet_moves[static_cast<size_t>(q)];
-                        if (qm != m) {
-                            Piece qpc = pos.piece_on(qm.from_sq());
-                            heuristics.history[to_index(qpc)][to_index(qm.to_sq())] -= bonus;
-
-                            if (prev_move.is_ok()) {
-                                Piece pc1 = pos.piece_on(prev_move.to_sq());
-                                if (pc1 != NO_PIECE) {
-                                    size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
-                                    if (prev_idx1 < 1024) {
-                                        heuristics.cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
-                                    }
+                        if (prev_move.is_ok()) {
+                            Piece pc1 = pos.piece_on(prev_move.to_sq());
+                            if (pc1 != NO_PIECE) {
+                                size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                                if (prev_idx1 < 1024) {
+                                    heuristics.shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
                                 }
                             }
+                        }
 
-                            if (prev_move_2.is_ok()) {
-                                Piece pc2 = pos.piece_on(prev_move_2.to_sq());
-                                if (pc2 != NO_PIECE) {
-                                    size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
-                                    if (prev_idx2 < 1024) {
-                                        heuristics.cont_history_2[prev_idx2][to_index(qpc)][to_index(qm.to_sq())] -= bonus;
+                        if (prev_move_2.is_ok()) {
+                            Piece pc2 = pos.piece_on(prev_move_2.to_sq());
+                            if (pc2 != NO_PIECE) {
+                                size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                                if (prev_idx2 < 1024) {
+                                    heuristics.shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
+                                }
+                            }
+                        }
+
+                        // Penalize other quiet moves that failed to cause a cutoff
+                        for (int q = 0; q < quiet_count; ++q) {
+                            Move qm = quiet_moves[static_cast<size_t>(q)];
+                            if (qm != m) {
+                                Piece qpc = pos.piece_on(qm.from_sq());
+                                heuristics.shared->history[to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+
+                                if (prev_move.is_ok()) {
+                                    Piece pc1 = pos.piece_on(prev_move.to_sq());
+                                    if (pc1 != NO_PIECE) {
+                                        size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
+                                        if (prev_idx1 < 1024) {
+                                            heuristics.shared->cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+                                        }
+                                    }
+                                }
+
+                                if (prev_move_2.is_ok()) {
+                                    Piece pc2 = pos.piece_on(prev_move_2.to_sq());
+                                    if (pc2 != NO_PIECE) {
+                                        size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
+                                        if (prev_idx2 < 1024) {
+                                            heuristics.shared->cont_history_2[prev_idx2][to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+                                        }
                                     }
                                 }
                             }
@@ -462,7 +464,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                 } else {
                     Piece pc = pos.piece_on(m.from_sq());
                     PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
-                    heuristics.capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)] += bonus;
+                    if (heuristics.shared) {
+                        heuristics.shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].fetch_add(bonus, std::memory_order_relaxed);
+                    }
                 }
             }
             break;
@@ -506,9 +510,11 @@ static void worker_run(SearchWorker* w) {
         }
 
         // Decay history
-        for (auto& row : w->heuristics.history) {
-            for (auto& val : row) {
-                val /= 2;
+        if (w->heuristics.shared) {
+            for (auto& row : w->heuristics.shared->history) {
+                for (auto& val : row) {
+                    val.store(val.load(std::memory_order_relaxed) / 2, std::memory_order_relaxed);
+                }
             }
         }
     }
@@ -576,10 +582,15 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     std::vector<std::unique_ptr<SearchWorker>> workers;
     active_workers.clear();
 
+    auto shared_heuristics = std::make_unique<SharedHeuristics>();
+    shared_heuristics->clear();
+
     // 1. Initialize all workers (cloning board positions and stack histories)
     for (int i = 0; i < threads_to_spawn; ++i) {
         auto w = std::make_unique<SearchWorker>();
         w->id = i;
+        w->heuristics.shared = shared_heuristics.get();
+        w->heuristics.clear();
         w->ss.limits = limits;
         w->ss.thread_id = i;
         w->ss.time_limit = time_limit;
@@ -703,7 +714,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 for (int j = 0; j < child_len && current_depth < d; ++j) {
                     Move child_m = main_worker->ss.pv_table[1][static_cast<size_t>(j)];
-                    if (child_m == Move::none() || !child_m.is_ok()) break;
+                    if (child_m == Move::none() || !child_m.is_ok() || !pv_pos.pseudo_legal(child_m) || !pv_pos.legal(child_m)) break;
 
                     pv_str += " " + child_m.to_string();
                     if (!pv_pos.make_move(child_m, pv_history[pv_idx++])) break;
@@ -862,7 +873,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             for (int j = 0; j < pv_len && current_depth < d && pv_idx < MAX_PLY; ++j) {
                 Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
-                if (m == Move::none() || !m.is_ok() || !pv_pos.legal(m)) break;
+                if (m == Move::none() || !m.is_ok() || !pv_pos.pseudo_legal(m) || !pv_pos.legal(m)) break;
 
                 pv_str += (pv_str.empty() ? "" : " ") + m.to_string();
                 if (!pv_pos.make_move(m, pv_history[pv_idx++])) break;
@@ -919,9 +930,11 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             }
 
             // Decay history
-            for (auto& row : main_worker->heuristics.history) {
-                for (auto& val : row) {
-                    val /= 2;
+            if (shared_heuristics) {
+                for (auto& row : shared_heuristics->history) {
+                    for (auto& val : row) {
+                        val.store(val.load(std::memory_order_relaxed) / 2, std::memory_order_relaxed);
+                    }
                 }
             }
 

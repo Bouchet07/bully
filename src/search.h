@@ -65,32 +65,53 @@ inline bool& use_tt = config.tt;
 inline bool& use_killers = config.killers;
 inline bool& use_history = config.history;
 
-// Quiet & Capture Move Ordering heuristic tables local to each search thread
+// Quiet & Capture Move Ordering heuristic tables shared across all search threads
+struct SharedHeuristics {
+    // 1D History: [Piece][ToSquare]
+    std::array<std::array<std::atomic<int>, 64>, 16> history{};
+
+    // 1-ply Continuation History: [PiecePrev * 64 + ToSqPrev][PieceCurr][ToSqCurr]
+    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_1{};
+
+    // 2-ply Continuation History: [PiecePrev2 * 64 + ToSqPrev2][PieceCurr][ToSqCurr]
+    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_2{};
+
+    // Capture History: [Piece][ToSquare][VictimPieceType]
+    std::array<std::array<std::array<std::atomic<int>, 8>, 64>, 16> capture_history{};
+
+    void clear() {
+        for (auto& row : history) {
+            for (auto& val : row) val.store(0, std::memory_order_relaxed);
+        }
+        for (auto& table : cont_history_1) {
+            for (auto& row : table) {
+                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+            }
+        }
+        for (auto& table : cont_history_2) {
+            for (auto& row : table) {
+                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+            }
+        }
+        for (auto& table : capture_history) {
+            for (auto& row : table) {
+                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+            }
+        }
+    }
+};
+
 struct Heuristics {
     std::array<Move, MAX_PLY> killer1 = {Move::none()};
     std::array<Move, MAX_PLY> killer2 = {Move::none()};
     std::array<std::array<Move, 64>, 64> countermoves = {};
-    
-    // 1D History: [Piece][ToSquare]
-    std::array<std::array<int, 64>, 16> history = {{{0}}};
 
-    // 1-ply Continuation History: [PiecePrev * 64 + ToSqPrev][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<int, 64>, 16>, 1024> cont_history_1 = {{{0}}};
-
-    // 2-ply Continuation History: [PiecePrev2 * 64 + ToSqPrev2][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<int, 64>, 16>, 1024> cont_history_2 = {{{0}}};
-
-    // Capture History: [Piece][ToSquare][VictimPieceType]
-    std::array<std::array<std::array<int, 8>, 64>, 16> capture_history = {{{0}}};
+    SharedHeuristics* shared = nullptr;
 
     void clear() {
         killer1.fill(Move::none());
         killer2.fill(Move::none());
         for (auto& row : countermoves) row.fill(Move::none());
-        for (auto& row : history) row.fill(0);
-        for (auto& table : cont_history_1) for (auto& row : table) row.fill(0);
-        for (auto& table : cont_history_2) for (auto& row : table) row.fill(0);
-        for (auto& table : capture_history) for (auto& row : table) row.fill(0);
     }
 };
 

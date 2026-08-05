@@ -28,8 +28,8 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
         PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
         
         int cap_hist = 0;
-        if (heuristics && Search::config.history) {
-            cap_hist = heuristics->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)] / 32;
+        if (heuristics && heuristics->shared && Search::config.history) {
+            cap_hist = heuristics->shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].load(std::memory_order_relaxed) / 32;
         }
 
         if (out_see < 0) {
@@ -47,15 +47,15 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
         if (prev_move.is_ok() && m == heuristics->countermoves[to_index(prev_move.from_sq())][to_index(prev_move.to_sq())]) score += 65000;
     }
 
-    if (heuristics && Search::config.history) {
-        score += heuristics->history[to_index(pc)][to_index(m.to_sq())];
+    if (heuristics && heuristics->shared && Search::config.history) {
+        score += heuristics->shared->history[to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
 
         if (prev_move.is_ok()) {
             Piece pc1 = pos.piece_on(prev_move.to_sq());
             if (pc1 != NO_PIECE) {
                 size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
                 if (prev_idx1 < 1024) {
-                    score += heuristics->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())];
+                    score += heuristics->shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
                 }
             }
         }
@@ -65,7 +65,7 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
             if (pc2 != NO_PIECE) {
                 size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
                 if (prev_idx2 < 1024) {
-                    score += heuristics->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())];
+                    score += heuristics->shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
                 }
             }
         }
