@@ -40,7 +40,7 @@ public:
                Move prev_move, Move prev_move_2, MoveList& list_ref, std::array<ExtMove, MAX_MOVES>& bad_caps_ref);
 
     // Yields the next best move in order, or Move::none() when moves are exhausted
-    [[nodiscard]] Move next_move(const Position& pos, bool skip_quiets = false);
+    [[nodiscard]] Move next_move(const Position& pos, bool skip_quiets = false, bool skip_bad_captures = false);
 
 private:
     Move tt_move_ = Move::none();

@@ -74,11 +74,14 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
     return score;
 }
 
-Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
+Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_captures) {
     while (true) {
         switch (stage_) {
             case Stage::MAIN_TT: {
                 stage_ = Stage::CAPTURE_INIT;
+                if (tt_move_.is_ok() && skip_bad_captures && pos.see(tt_move_) < 0) {
+                    break;
+                }
                 return tt_move_;
             }
 
@@ -106,7 +109,9 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
                     if (em.move == tt_move_) continue;
 
                     if (em.see_score < 0) {
-                        bad_captures_[bad_capture_count_++] = em;
+                        if (!skip_bad_captures) {
+                            bad_captures_[bad_capture_count_++] = em;
+                        }
                         continue;
                     }
                     return em.move;
@@ -117,7 +122,7 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
 
             case Stage::QUIET_INIT: {
                 if (skip_quiets) {
-                    stage_ = Stage::DONE;
+                    stage_ = skip_bad_captures ? Stage::DONE : Stage::BAD_CAPTURES;
                     break;
                 }
                 list_.generate_quiets(pos);
@@ -148,6 +153,10 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets) {
             }
 
             case Stage::BAD_CAPTURES: {
+                if (skip_bad_captures) {
+                    stage_ = Stage::DONE;
+                    break;
+                }
                 if (bad_capture_idx_ < bad_capture_count_) {
                     return bad_captures_[bad_capture_idx_++].move;
                 }
