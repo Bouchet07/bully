@@ -391,12 +391,19 @@ bool Position::pseudo_legal(Move m) const {
         return false;
     }
 
+    PieceType pt = type_of(pc);
     MoveType type = m.type_of();
+
     if (type == EN_PASSANT) {
-        return to == st->en_passant_square;
+        return pt == PAWN && to == st->en_passant_square;
+    }
+
+    if (type == PROMOTION) {
+        if (pt != PAWN || relative_rank(us, to) != RANK_8) return false;
     }
 
     if (type == CASTLING) {
+        if (pt != KING) return false;
         if (us == WHITE) {
             return (from == SQ_E1 && (to == SQ_G1 || to == SQ_C1));
         } else {
@@ -405,7 +412,6 @@ bool Position::pseudo_legal(Move m) const {
     }
 
     // 3. Verify piece can actually attack/reach target square
-    PieceType pt = type_of(pc);
     Bitboard occ = occupied();
 
     if (pt == PAWN) {

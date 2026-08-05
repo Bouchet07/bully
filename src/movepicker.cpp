@@ -9,7 +9,7 @@ MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search:
     list_.clear();
     bad_capture_count_ = 0;
     bad_capture_idx_ = 0;
-    if (!tt_move_.is_ok() || !pos.pseudo_legal(tt_move_) || !pos.legal(tt_move_)) {
+    if (!tt_move_.is_ok() || !pos.pseudo_legal(tt_move_)) {
         tt_move_ = Move::none();
         stage_ = Stage::CAPTURE_INIT;
     }
