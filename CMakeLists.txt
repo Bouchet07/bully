@@ -77,9 +77,14 @@ else()
     set(IS_ARM_TARGET FALSE)
 endif()
 
+# Default to Release build type if not explicitly set
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Release, Debug)" FORCE)
+endif()
+
 # Translate architecture selection to compiler flags and binary suffix
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    # Base warning and optimization flags
+    # Base warning flags
     set(ARCH_FLAGS
         -Wall
         -Wextra
@@ -90,8 +95,17 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -Wcast-align
         -Wunused
         -Woverloaded-virtual
-        -O3
     )
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "Configuring DEBUG build (-O1 -g -fno-omit-frame-pointer)")
+        list(APPEND ARCH_FLAGS -O1 -g -fno-omit-frame-pointer)
+        set(DEBUG_SUFFIX "-debug")
+    else()
+        message(STATUS "Configuring RELEASE build (-O3)")
+        list(APPEND ARCH_FLAGS -O3)
+        set(DEBUG_SUFFIX "")
+    endif()
 
     if(IS_ARM_TARGET)
         if(BULLY_ARCH STREQUAL "armv8-dotprod")
@@ -178,8 +192,8 @@ target_compile_definitions(engine_lib PUBLIC
 add_executable(bully src/main.cpp)
 target_link_libraries(bully PRIVATE engine_lib)
 
-# Automatically rename binary based on target architecture
-set_target_properties(bully PROPERTIES OUTPUT_NAME "bully${BINARY_SUFFIX}")
+# Automatically rename binary based on target architecture and build type
+set_target_properties(bully PROPERTIES OUTPUT_NAME "bully${BINARY_SUFFIX}${DEBUG_SUFFIX}")
 
 # ============================================================================
 # Test Configuration
