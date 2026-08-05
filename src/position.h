@@ -88,6 +88,9 @@ public:
     [[nodiscard]] bool attacked(Square sq, Color attacked_by) const;
     [[nodiscard]] bool attacked(Square sq, Color attacked_by, Bitboard occ) const;
 
+    // Check if an untrusted move (e.g. from TT) is mechanically pseudo-legal
+    [[nodiscard]] bool pseudo_legal(Move m) const;
+
     // Make a move. Returns false if the move was illegal (leaves King in check)
     bool make_move(Move m, StateInfo& new_state);
 

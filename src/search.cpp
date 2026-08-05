@@ -947,7 +947,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             int dummy_depth;
             Bound dummy_bound;
             Move tt_m = Move::none();
-            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.legal(tt_m)) {
+            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.pseudo_legal(tt_m) && pos.legal(tt_m)) {
                 best_move = tt_m;
             } else {
                 MoveList list;

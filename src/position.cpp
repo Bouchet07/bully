@@ -5,6 +5,7 @@
 #include <format>
 #include <algorithm>
 #include "position.h"
+#include "attacks.h"
 
 namespace Bully {
 
@@ -368,6 +369,65 @@ Bitboard Position::blockers_for_king(Color c) const {
         }
     }
     return blockers;
+}
+
+bool Position::pseudo_legal(Move m) const {
+    if (!m.is_ok()) return false;
+
+    Square from = m.from_sq();
+    Square to = m.to_sq();
+    if (from >= SQUARE_NB || to >= SQUARE_NB) return false;
+
+    Piece pc = board[to_index(from)];
+    Color us = side_to_move_color;
+
+    // 1. Piece must exist and belong to the side to move
+    if (pc == NO_PIECE || color_of(pc) != us) return false;
+
+    Piece target = board[to_index(to)];
+
+    // 2. Cannot capture our own pieces or the enemy King
+    if (target != NO_PIECE && (color_of(target) == us || type_of(target) == KING)) {
+        return false;
+    }
+
+    MoveType type = m.type_of();
+    if (type == EN_PASSANT) {
+        return to == st->en_passant_square;
+    }
+
+    if (type == CASTLING) {
+        if (us == WHITE) {
+            return (from == SQ_E1 && (to == SQ_G1 || to == SQ_C1));
+        } else {
+            return (from == SQ_E8 && (to == SQ_G8 || to == SQ_C8));
+        }
+    }
+
+    // 3. Verify piece can actually attack/reach target square
+    PieceType pt = type_of(pc);
+    Bitboard occ = occupied();
+
+    if (pt == PAWN) {
+        Bitboard attacks = pawn_attacks(us, from);
+        if (target != NO_PIECE) {
+            return (attacks & square_bb(to)) != 0;
+        } else {
+            Square push1 = from + pawn_push(us);
+            if (to == push1) return true;
+            Square push2 = from + 2 * pawn_push(us);
+            if (to == push2 && (relative_rank(us, from) == RANK_2) && board[to_index(push1)] == NO_PIECE) return true;
+            return false;
+        }
+    }
+
+    if (pt == KNIGHT) return (knight_attacks(from) & square_bb(to)) != 0;
+    if (pt == BISHOP) return (bishop_attacks(from, occ) & square_bb(to)) != 0;
+    if (pt == ROOK)   return (rook_attacks(from, occ) & square_bb(to)) != 0;
+    if (pt == QUEEN)  return (queen_attacks(from, occ) & square_bb(to)) != 0;
+    if (pt == KING)   return (king_attacks(from) & square_bb(to)) != 0;
+
+    return false;
 }
 
 bool Position::legal(Move m) const {
