@@ -237,27 +237,73 @@ Value evaluate(const Position& pos) {
     const int16_t* us_acc   = (us == WHITE) ? acc.white.data() : acc.black.data();
     const int16_t* them_acc = (us == WHITE) ? acc.black.data() : acc.white.data();
 
-    // Layer 1 Forward Pass (Clipped ReLU + Linear transform to 32 neurons)
+    alignas(64) std::array<uint8_t, TRANSFORMER_HALF_DIM * 2> packed_activations;
+
+#if defined(USE_AVX2) || defined(USE_AVX512)
+    // 1. Vectorized ClippedReLU & Packing (int16_t -> uint8_t)
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i max_val = _mm256_set1_epi16(127);
+    
+    for (size_t i = 0; i < TRANSFORMER_HALF_DIM / 16; ++i) {
+        // Load Us and Them accumulators
+        __m256i u = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(us_acc + i * 16));
+        __m256i t = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(them_acc + i * 16));
+        
+        // Clamp to [0, 127]
+        u = _mm256_min_epi16(_mm256_max_epi16(u, zero), max_val);
+        t = _mm256_min_epi16(_mm256_max_epi16(t, zero), max_val);
+        
+        // Pack 16-bit ints into 8-bit ints (Warning: AVX2 packs interleave lanes, so we store directly)
+        __m256i packed = _mm256_packs_epi16(u, t); 
+        
+        // Permute to fix AVX lane crossing
+        packed = _mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(packed_activations.data() + i * 32), packed);
+    }
+#else
+    // Generic Fallback
+    for (size_t i = 0; i < TRANSFORMER_HALF_DIM; ++i) {
+        packed_activations[i] = static_cast<uint8_t>(std::clamp<int16_t>(us_acc[i], 0, 127));
+        packed_activations[TRANSFORMER_HALF_DIM + i] = static_cast<uint8_t>(std::clamp<int16_t>(them_acc[i], 0, 127));
+    }
+#endif
+
     std::array<int32_t, L1_DIM> l1_out = net_weights.l1_biases;
 
+    // 2. Vectorized Dot Product for L1 Layer
     for (size_t i = 0; i < L1_DIM; ++i) {
         const int8_t* w = &net_weights.l1_weights[i * 2 * TRANSFORMER_HALF_DIM];
         int32_t sum = 0;
 
-        // First 256 inputs (us perspective)
-        for (size_t j = 0; j < TRANSFORMER_HALF_DIM; ++j) {
-            int16_t val = us_acc[j];
-            int16_t activated = std::clamp<int16_t>(val, 0, 127);
-            sum += activated * static_cast<int32_t>(w[j]);
+#if defined(USE_AVX2) || defined(USE_AVX512)
+        __m256i v_sum = _mm256_setzero_si256();
+        const __m256i ones = _mm256_set1_epi16(1);
+
+        for (size_t j = 0; j < (2 * TRANSFORMER_HALF_DIM) / 32; ++j) {
+            __m256i act = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(packed_activations.data() + j * 32));
+            __m256i weight = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + j * 32));
+
+            // Multiply uint8_t activations by int8_t weights -> int16_t pairs
+            __m256i mult = _mm256_maddubs_epi16(act, weight);
+            
+            // Multiply int16_t by 1 and horizontally add to int32_t
+            __m256i dot = _mm256_madd_epi16(mult, ones);
+            
+            v_sum = _mm256_add_epi32(v_sum, dot);
         }
 
-        // Next 256 inputs (them perspective)
-        for (size_t j = 0; j < TRANSFORMER_HALF_DIM; ++j) {
-            int16_t val = them_acc[j];
-            int16_t activated = std::clamp<int16_t>(val, 0, 127);
-            sum += activated * static_cast<int32_t>(w[TRANSFORMER_HALF_DIM + j]);
+        // Horizontal sum of the 8 int32_t values in v_sum
+        __m128i hi = _mm256_extracti128_si256(v_sum, 1);
+        __m128i lo = _mm256_castsi256_si128(v_sum);
+        hi = _mm_add_epi32(hi, lo);
+        hi = _mm_add_epi32(hi, _mm_shuffle_epi32(hi, _MM_SHUFFLE(1, 0, 3, 2)));
+        hi = _mm_add_epi32(hi, _mm_shuffle_epi32(hi, _MM_SHUFFLE(2, 3, 0, 1)));
+        sum += _mm_cvtsi128_si32(hi);
+#else
+        for (size_t j = 0; j < 2 * TRANSFORMER_HALF_DIM; ++j) {
+            sum += packed_activations[j] * static_cast<int32_t>(w[j]);
         }
-
+#endif
         l1_out[i] += sum;
     }
 
