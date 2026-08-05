@@ -414,7 +414,7 @@ bool Position::in_check() const {
 }
 
 bool Position::make_move(Move m, StateInfo& new_state) {
-    if (!legal(m)) {
+    if (!m.is_ok() || m.from_sq() >= SQUARE_NB || m.to_sq() >= SQUARE_NB || !legal(m)) {
         return false;
     }
 

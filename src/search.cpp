@@ -860,7 +860,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             for (int j = 0; j < pv_len && current_depth < d && pv_idx < MAX_PLY; ++j) {
                 Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
-                if (m == Move::none() || !m.is_ok()) break;
+                if (m == Move::none() || !m.is_ok() || !pv_pos.legal(m)) break;
 
                 pv_str += (pv_str.empty() ? "" : " ") + m.to_string();
                 if (!pv_pos.make_move(m, pv_history[pv_idx++])) break;
@@ -936,15 +936,30 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
     }
 
-    // If main thread failed to retrieve move, fallback check PV table or TT
-    if (best_move == Move::none()) {
-        if (main_worker->ss.pv_length[0] > 0) {
+    // If main thread failed to retrieve move or best_move is illegal, fallback check PV table, TT, or legal movegen
+    if (best_move == Move::none() || !pos.legal(best_move)) {
+        if (main_worker->ss.pv_length[0] > 0 && pos.legal(main_worker->ss.pv_table[0][0])) {
             best_move = main_worker->ss.pv_table[0][0];
         } else {
             Value dummy_score, dummy_eval;
             int dummy_depth;
             Bound dummy_bound;
-            TT.probe(pos.key(), best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0);
+            Move tt_m = Move::none();
+            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.legal(tt_m)) {
+                best_move = tt_m;
+            } else {
+                MoveList list;
+                list.generate(pos);
+                for (size_t i = 0; i < list.size(); ++i) {
+                    StateInfo si;
+                    si.accumulator = &main_worker->accumulators[0];
+                    if (main_worker->pos.make_move(list[i].move, si)) {
+                        best_move = list[i].move;
+                        main_worker->pos.unmake_move(list[i].move);
+                        break;
+                    }
+                }
+            }
         }
     }
 
