@@ -410,14 +410,14 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
                     Piece pc = pos.piece_on(m.from_sq());
                     if (heuristics.shared) {
-                        heuristics.shared->history[to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
+                        update_history(heuristics.shared->history[to_index(pc)][to_index(m.to_sq())], bonus);
 
                         if (prev_move.is_ok()) {
                             Piece pc1 = pos.piece_on(prev_move.to_sq());
                             if (pc1 != NO_PIECE) {
                                 size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
                                 if (prev_idx1 < 1024) {
-                                    heuristics.shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
+                                    update_history(heuristics.shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())], bonus);
                                 }
                             }
                         }
@@ -427,7 +427,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                             if (pc2 != NO_PIECE) {
                                 size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
                                 if (prev_idx2 < 1024) {
-                                    heuristics.shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())].fetch_add(bonus, std::memory_order_relaxed);
+                                    update_history(heuristics.shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())], bonus);
                                 }
                             }
                         }
@@ -437,14 +437,14 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                             Move qm = quiet_moves[static_cast<size_t>(q)];
                             if (qm != m) {
                                 Piece qpc = pos.piece_on(qm.from_sq());
-                                heuristics.shared->history[to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+                                update_history(heuristics.shared->history[to_index(qpc)][to_index(qm.to_sq())], -bonus);
 
                                 if (prev_move.is_ok()) {
                                     Piece pc1 = pos.piece_on(prev_move.to_sq());
                                     if (pc1 != NO_PIECE) {
                                         size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
                                         if (prev_idx1 < 1024) {
-                                            heuristics.shared->cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+                                            update_history(heuristics.shared->cont_history_1[prev_idx1][to_index(qpc)][to_index(qm.to_sq())], -bonus);
                                         }
                                     }
                                 }
@@ -454,7 +454,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                                     if (pc2 != NO_PIECE) {
                                         size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
                                         if (prev_idx2 < 1024) {
-                                            heuristics.shared->cont_history_2[prev_idx2][to_index(qpc)][to_index(qm.to_sq())].fetch_sub(bonus, std::memory_order_relaxed);
+                                            update_history(heuristics.shared->cont_history_2[prev_idx2][to_index(qpc)][to_index(qm.to_sq())], -bonus);
                                         }
                                     }
                                 }
@@ -465,7 +465,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
                     Piece pc = pos.piece_on(m.from_sq());
                     PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
                     if (heuristics.shared) {
-                        heuristics.shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].fetch_add(bonus, std::memory_order_relaxed);
+                        update_history(heuristics.shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)], bonus);
                     }
                 }
             }
@@ -507,15 +507,6 @@ static void worker_run(SearchWorker* w) {
         pvs(w->pos, -VALUE_INFINITE, VALUE_INFINITE, d, 0, w->ss, w->heuristics);
         if (stopped.load(std::memory_order_relaxed)) {
             break;
-        }
-
-        // Decay history
-        if (w->heuristics.shared) {
-            for (auto& row : w->heuristics.shared->history) {
-                for (auto& val : row) {
-                    val.store(val.load(std::memory_order_relaxed) / 2, std::memory_order_relaxed);
-                }
-            }
         }
     }
 }
@@ -927,15 +918,6 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             if (limits.depth == -1 && std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
                 break;
-            }
-
-            // Decay history
-            if (shared_heuristics) {
-                for (auto& row : shared_heuristics->history) {
-                    for (auto& val : row) {
-                        val.store(val.load(std::memory_order_relaxed) / 2, std::memory_order_relaxed);
-                    }
-                }
             }
 
             last_score = score;

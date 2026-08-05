@@ -115,6 +115,18 @@ struct Heuristics {
     }
 };
 
+constexpr int HISTORY_MAX = 16384;
+
+// Continuous gravity update formula for atomic history values
+inline void update_history(std::atomic<int>& entry, int bonus) {
+    int clamped_bonus = std::clamp(bonus, -HISTORY_MAX, HISTORY_MAX);
+    int current = entry.load(std::memory_order_relaxed);
+    int next;
+    do {
+        next = current + clamped_bonus - (current * std::abs(clamped_bonus)) / HISTORY_MAX;
+    } while (!entry.compare_exchange_weak(current, next, std::memory_order_relaxed));
+}
+
 // Correction History table mapping pawn structures to static evaluation adjustments
 constexpr size_t CORR_HIST_SIZE = 16384;
 constexpr int CORR_HIST_MAX = 16384;
