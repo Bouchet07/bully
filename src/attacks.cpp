@@ -162,11 +162,11 @@ constexpr Bitboard bishop_attacks_on_the_fly(Square s, Bitboard occ) {
     return attacks;
 }
 
-constexpr Bitboard reconstruct_occupancy(int index, Bitboard mask) {
+constexpr Bitboard reconstruct_occupancy(size_t index, Bitboard mask) {
     Bitboard occ = 0;
     for (int j = 0; mask; ++j) {
         Square sq = pop_lsb(mask);
-        if (index & (1 << j)) {
+        if (index & (1ULL << j)) {
             occ |= sq;
         }
     }
@@ -183,36 +183,36 @@ uint64_t random_uint64_sparse(std::mt19937_64& rng) {
 uint64_t find_magic(Square s, bool is_rook, Bitboard mask, int shift, Bitboard* attack_table_dest) {
     std::mt19937_64 rng(10283921ULL ^ to_index(s) ^ (is_rook ? 1ULL : 0ULL));
     int num_bits = popcnt(mask);
-    int num_occupancies = 1 << num_bits;
+    size_t num_occupancies = 1ULL << num_bits;
 
-    std::vector<Bitboard> occupancies(static_cast<size_t>(num_occupancies));
-    std::vector<Bitboard> attacks(static_cast<size_t>(num_occupancies));
-    for (int i = 0; i < num_occupancies; ++i) {
-        occupancies[static_cast<size_t>(i)] = reconstruct_occupancy(i, mask);
-        attacks[static_cast<size_t>(i)] = is_rook ? rook_attacks_on_the_fly(s, occupancies[static_cast<size_t>(i)]) 
-                                                  : bishop_attacks_on_the_fly(s, occupancies[static_cast<size_t>(i)]);
+    std::vector<Bitboard> occupancies(num_occupancies);
+    std::vector<Bitboard> attacks(num_occupancies);
+    for (size_t i = 0; i < num_occupancies; ++i) {
+        occupancies[i] = reconstruct_occupancy(i, mask);
+        attacks[i] = is_rook ? rook_attacks_on_the_fly(s, occupancies[i]) 
+                             : bishop_attacks_on_the_fly(s, occupancies[i]);
     }
 
-    std::vector<Bitboard> test_table(static_cast<size_t>(num_occupancies));
+    std::vector<Bitboard> test_table(num_occupancies);
     while (true) {
         uint64_t candidate = random_uint64_sparse(rng);
         if (popcnt((candidate * mask) & 0xFF00000000000000ULL) < 6) continue;
 
         std::fill(test_table.begin(), test_table.end(), 0);
         bool fail = false;
-        for (int i = 0; i < num_occupancies; ++i) {
-            uint64_t key = ((occupancies[static_cast<size_t>(i)] & mask) * candidate) >> shift;
-            if (test_table[static_cast<size_t>(key)] != 0 && test_table[static_cast<size_t>(key)] != attacks[static_cast<size_t>(i)]) {
+        for (size_t i = 0; i < num_occupancies; ++i) {
+            uint64_t key = ((occupancies[i] & mask) * candidate) >> shift;
+            if (test_table[key] != 0 && test_table[key] != attacks[i]) {
                 fail = true;
                 break;
             }
-            test_table[static_cast<size_t>(key)] = attacks[static_cast<size_t>(i)];
+            test_table[key] = attacks[i];
         }
 
         if (!fail) {
-            for (int i = 0; i < num_occupancies; ++i) {
-                uint64_t key = ((occupancies[static_cast<size_t>(i)] & mask) * candidate) >> shift;
-                attack_table_dest[key] = attacks[static_cast<size_t>(i)];
+            for (size_t i = 0; i < num_occupancies; ++i) {
+                uint64_t key = ((occupancies[i] & mask) * candidate) >> shift;
+                attack_table_dest[key] = attacks[i];
             }
             return candidate;
         }
@@ -233,16 +233,16 @@ void init_attacks() {
         size_t idx = to_index(s);
         Bitboard r_mask = RookMasks[idx];
         int r_bits = popcnt(r_mask);
-        for (int i = 0; i < (1 << r_bits); ++i) {
+        for (size_t i = 0; i < (1ULL << r_bits); ++i) {
             Bitboard occ = reconstruct_occupancy(i, r_mask);
-            RookAttacks[idx][static_cast<size_t>(i)] = rook_attacks_on_the_fly(s, occ);
+            RookAttacks[idx][i] = rook_attacks_on_the_fly(s, occ);
         }
 
         Bitboard b_mask = BishopMasks[idx];
         int b_bits = popcnt(b_mask);
-        for (int i = 0; i < (1 << b_bits); ++i) {
+        for (size_t i = 0; i < (1ULL << b_bits); ++i) {
             Bitboard occ = reconstruct_occupancy(i, b_mask);
-            BishopAttacks[idx][static_cast<size_t>(i)] = bishop_attacks_on_the_fly(s, occ);
+            BishopAttacks[idx][i] = bishop_attacks_on_the_fly(s, occ);
         }
     }
 #else
