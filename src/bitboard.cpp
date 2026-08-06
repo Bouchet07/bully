@@ -13,8 +13,8 @@ SquareTable        BetweenBB;
 
 void init_bitboards() {
     // 1. Initialize SquareDistance
-    for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1) {
-        for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2) {
+    for (Square s1 = SQ_A1; s1 < SQUARE_NB; ++s1) {
+        for (Square s2 = SQ_A1; s2 < SQUARE_NB; ++s2) {
             SquareDistance[to_index(s1)][to_index(s2)] = static_cast<uint8_t>(
                 std::max(distance(file_of(s1), file_of(s2)), distance(rank_of(s1), rank_of(s2)))
             );
@@ -22,8 +22,8 @@ void init_bitboards() {
     }
 
     // 2. Initialize LineBB and BetweenBB
-    for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1) {
-        for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2) {
+    for (Square s1 = SQ_A1; s1 < SQUARE_NB; ++s1) {
+        for (Square s2 = SQ_A1; s2 < SQUARE_NB; ++s2) {
             LineBB[to_index(s1)][to_index(s2)] = 0;
             BetweenBB[to_index(s1)][to_index(s2)] = 0;
 
@@ -104,7 +104,7 @@ void pretty_print(Bitboard bitboard, bool Use_UTF8) {
             std::cout << std::format(" {} |", std::to_underlying(rank) + 1);
         }
 
-        for (File file = FILE_A; file <= FILE_H; ++file) {
+        for (File file = FILE_A; file < FILE_NB; ++file) {
             Square square = make_square(file, rank);
             if (Use_UTF8) {
                 std::cout << std::format(" {} │", (bitboard & square) ? "●" : " ");

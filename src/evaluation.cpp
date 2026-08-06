@@ -98,32 +98,29 @@ constexpr std::array<int, 64> KingEndgamePST = {
 };
 
 // Precomputed file spans and adjacent files
-constexpr std::array<Bitboard, 8> AdjacentFiles = []() {
-    std::array<Bitboard, 8> arr{};
-    for (int i = 0; i < 8; ++i) {
-        File f = static_cast<File>(i);
+constexpr std::array<Bitboard, FILE_NB> AdjacentFiles = []() {
+    std::array<Bitboard, FILE_NB> arr{};
+    for (File f = FILE_A; f < FILE_NB; ++f) {
         Bitboard mask = 0;
-        if (f > FILE_A) mask |= file_bb(static_cast<File>(std::to_underlying(f) - 1));
-        if (f < FILE_H) mask |= file_bb(static_cast<File>(std::to_underlying(f) + 1));
+        if (f > FILE_A) mask |= file_bb(f - 1);
+        if (f < FILE_H) mask |= file_bb(f + 1);
         arr[to_index(f)] = mask;
     }
     return arr;
 }();
 
-constexpr std::array<Bitboard, 64> FrontSpansWhite = []() {
-    std::array<Bitboard, 64> arr{};
-    for (int i = 0; i < 64; ++i) {
-        Square sq = static_cast<Square>(i);
+constexpr std::array<Bitboard, SQUARE_NB> FrontSpansWhite = []() {
+    std::array<Bitboard, SQUARE_NB> arr{};
+    for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
         int shift_amt = 8 * (std::to_underlying(rank_of(sq)) + 1);
         arr[to_index(sq)] = (shift_amt >= 64) ? 0ULL : (~0ULL << shift_amt);
     }
     return arr;
 }();
 
-constexpr std::array<Bitboard, 64> FrontSpansBlack = []() {
-    std::array<Bitboard, 64> arr{};
-    for (int i = 0; i < 64; ++i) {
-        Square sq = static_cast<Square>(i);
+constexpr std::array<Bitboard, SQUARE_NB> FrontSpansBlack = []() {
+    std::array<Bitboard, SQUARE_NB> arr{};
+    for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
         arr[to_index(sq)] = (1ULL << (8 * std::to_underlying(rank_of(sq)))) - 1;
     }
     return arr;

@@ -222,14 +222,14 @@ uint64_t find_magic(Square s, bool is_rook, Bitboard mask, int shift, Bitboard* 
 
 void init_attacks() {
     // 1. Precompute masks
-    for (Square s = SQ_A1; s <= SQ_H8; ++s) {
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         RookMasks[to_index(s)] = rook_mask(s);
         BishopMasks[to_index(s)] = bishop_mask(s);
     }
 
     // 3. Precompute sliding attacks
 #ifdef USE_PEXT
-    for (Square s = SQ_A1; s <= SQ_H8; ++s) {
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         size_t idx = to_index(s);
         Bitboard r_mask = RookMasks[idx];
         int r_bits = popcnt(r_mask);
@@ -249,7 +249,7 @@ void init_attacks() {
     size_t rook_offset = 0;
     size_t bishop_offset = 0;
 
-    for (Square s = SQ_A1; s <= SQ_H8; ++s) {
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         size_t idx = to_index(s);
         RookOffsets[idx] = static_cast<int>(rook_offset);
         int r_bits = popcnt(RookMasks[idx]);

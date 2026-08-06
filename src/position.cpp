@@ -29,11 +29,11 @@ void init_cuckoo() {
     CuckooKeys.fill(0);
     CuckooMoves.fill(Move::none());
 
-    for (Piece pc = W_PAWN; pc <= B_KING; ++pc) {
+    for (Piece pc = W_PAWN; pc < PIECE_NB; ++pc) {
         if (type_of(pc) == PAWN) continue;
 
-        for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1) {
-            for (Square s2 = static_cast<Square>(to_index(s1) + 1); s2 <= SQ_H8; ++s2) {
+        for (Square s1 = SQ_A1; s1 < SQUARE_NB; ++s1) {
+            for (Square s2 = s1 + 1; s2 < SQUARE_NB; ++s2) {
                 Bitboard attacks = 0;
                 PieceType pt = type_of(pc);
                 if (pt == KNIGHT) attacks = knight_attacks(s1);
