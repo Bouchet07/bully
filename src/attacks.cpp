@@ -89,22 +89,10 @@ constexpr Bitboard bishop_mask(Square s) {
     Bitboard mask = 0;
     Rank r = rank_of(s);
     File f = file_of(s);
-    {
-        Rank nr = r + 1; File nf = f + 1;
-        for (; nr < RANK_8 && nf < FILE_H; ++nr, ++nf) mask |= make_square(nf, nr);
-    }
-    {
-        Rank nr = r - 1; File nf = f + 1;
-        for (; nr > RANK_1 && nf < FILE_H; --nr, ++nf) mask |= make_square(nf, nr);
-    }
-    {
-        Rank nr = r + 1; File nf = f - 1;
-        for (; nr < RANK_8 && nf > FILE_A; ++nr, --nf) mask |= make_square(nf, nr);
-    }
-    {
-        Rank nr = r - 1; File nf = f - 1;
-        for (; nr > RANK_1 && nf > FILE_A; --nr, --nf) mask |= make_square(nf, nr);
-    }
+    for (int d = 1; r + d < RANK_8 && f + d < FILE_H; ++d) mask |= make_square(f + d, r + d);
+    for (int d = 1; r - d > RANK_1 && f + d < FILE_H; ++d) mask |= make_square(f + d, r - d);
+    for (int d = 1; r + d < RANK_8 && f - d > FILE_A; ++d) mask |= make_square(f - d, r + d);
+    for (int d = 1; r - d > RANK_1 && f - d > FILE_A; ++d) mask |= make_square(f - d, r - d);
     return mask;
 }
 
@@ -146,40 +134,28 @@ constexpr Bitboard bishop_attacks_on_the_fly(Square s, Bitboard occ) {
     File f = file_of(s);
     
     // NE
-    {
-        Rank nr = r + 1; File nf = f + 1;
-        for (; nr < RANK_NB && nf < FILE_NB; ++nr, ++nf) {
-            Square sq = make_square(nf, nr);
-            attacks |= square_bb(sq);
-            if (occ & sq) break;
-        }
+    for (int d = 1; r + d < RANK_NB && f + d < FILE_NB; ++d) {
+        Square sq = make_square(f + d, r + d);
+        attacks |= square_bb(sq);
+        if (occ & sq) break;
     }
     // SE
-    {
-        Rank nr = r - 1; File nf = f + 1;
-        for (; nr >= RANK_1 && nf < FILE_NB; --nr, ++nf) {
-            Square sq = make_square(nf, nr);
-            attacks |= square_bb(sq);
-            if (occ & sq) break;
-        }
+    for (int d = 1; r - d >= RANK_1 && f + d < FILE_NB; ++d) {
+        Square sq = make_square(f + d, r - d);
+        attacks |= square_bb(sq);
+        if (occ & sq) break;
     }
     // NW
-    {
-        Rank nr = r + 1; File nf = f - 1;
-        for (; nr < RANK_NB && nf >= FILE_A; ++nr, --nf) {
-            Square sq = make_square(nf, nr);
-            attacks |= square_bb(sq);
-            if (occ & sq) break;
-        }
+    for (int d = 1; r + d < RANK_NB && f - d >= FILE_A; ++d) {
+        Square sq = make_square(f - d, r + d);
+        attacks |= square_bb(sq);
+        if (occ & sq) break;
     }
     // SW
-    {
-        Rank nr = r - 1; File nf = f - 1;
-        for (; nr >= RANK_1 && nf >= FILE_A; --nr, --nf) {
-            Square sq = make_square(nf, nr);
-            attacks |= square_bb(sq);
-            if (occ & sq) break;
-        }
+    for (int d = 1; r - d >= RANK_1 && f - d >= FILE_A; ++d) {
+        Square sq = make_square(f - d, r - d);
+        attacks |= square_bb(sq);
+        if (occ & sq) break;
     }
     return attacks;
 }
