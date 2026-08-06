@@ -1094,7 +1094,7 @@ void UCI::run_divide(int depth, bool is_go_cmd) {
     std::mutex output_mutex;
     std::atomic<uint64_t> total_nodes{0};
 
-    auto print_move_result = [this, is_go_cmd, &output_mutex, &total_nodes](Move m, uint64_t subnodes) {
+    auto print_move_result = [is_go_cmd, &output_mutex, &total_nodes](Move m, uint64_t subnodes) {
         total_nodes.fetch_add(subnodes, std::memory_order_relaxed);
         std::lock_guard<std::mutex> lock(output_mutex);
         if (is_go_cmd) {

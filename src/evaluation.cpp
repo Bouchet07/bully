@@ -8,13 +8,6 @@
 namespace Bully {
 namespace Eval {
 
-// Pops and returns the least significant bit (LSB) from a bitboard
-static inline Square pop_LSB(Bitboard& b) {
-    Square s = get_LSB(b);
-    b ^= s;
-    return s;
-}
-
 // ============================================================================
 // Piece-Square Tables (PST) for White
 // Evaluated from Rank 1 (indices 0-7) to Rank 8 (indices 56-63)

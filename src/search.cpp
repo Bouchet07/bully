@@ -9,7 +9,12 @@
 #include <cmath>
 
 #if defined(_WIN32)
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <windows.h>
+#elif defined(__ANDROID__)
+    #include <sched.h>
 #elif defined(__linux__)
     #include <pthread.h>
     #include <sched.h>
@@ -32,6 +37,14 @@ static void bind_thread_affinity(int thread_id) {
     if (hardware_threads > 0) {
         DWORD_PTR mask = 1ULL << (static_cast<unsigned int>(thread_id) % hardware_threads);
         SetThreadAffinityMask(GetCurrentThread(), mask);
+    }
+#elif defined(__ANDROID__)
+    unsigned int hardware_threads = std::thread::hardware_concurrency();
+    if (hardware_threads > 0) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(static_cast<unsigned int>(thread_id) % hardware_threads, &cpuset);
+        sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
     }
 #elif defined(__linux__)
     unsigned int hardware_threads = std::thread::hardware_concurrency();

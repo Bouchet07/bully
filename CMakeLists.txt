@@ -156,6 +156,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(engine_lib PUBLIC ${ARCH_FLAGS})
 
 elseif(MSVC)
+    add_compile_definitions(NOMINMAX)
+    add_compile_options(/wd4324)
     set(ARCH_FLAGS
         /W4
         /utf-8
