@@ -74,88 +74,112 @@ std::array<int, SQUARE_NB> BishopOffsets;
 #endif
 
 // On-the-fly generators for initialization
-Bitboard rook_mask(Square s) {
+constexpr Bitboard rook_mask(Square s) {
     Bitboard mask = 0;
-    int r = std::to_underlying(rank_of(s));
-    int f = std::to_underlying(file_of(s));
-    for (int nr = r + 1; nr < 7; ++nr) mask |= square_bb(make_square(static_cast<File>(f), static_cast<Rank>(nr)));
-    for (int nr = r - 1; nr > 0; --nr) mask |= square_bb(make_square(static_cast<File>(f), static_cast<Rank>(nr)));
-    for (int nf = f + 1; nf < 7; ++nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(r)));
-    for (int nf = f - 1; nf > 0; --nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(r)));
+    Rank r = rank_of(s);
+    File f = file_of(s);
+    for (Rank nr = r + 1; nr < RANK_8; ++nr) mask |= make_square(f, nr);
+    for (Rank nr = r - 1; nr > RANK_1; --nr) mask |= make_square(f, nr);
+    for (File nf = f + 1; nf < FILE_H; ++nf) mask |= make_square(nf, r);
+    for (File nf = f - 1; nf > FILE_A; --nf) mask |= make_square(nf, r);
     return mask;
 }
 
-Bitboard bishop_mask(Square s) {
+constexpr Bitboard bishop_mask(Square s) {
     Bitboard mask = 0;
-    int r = std::to_underlying(rank_of(s));
-    int f = std::to_underlying(file_of(s));
-    for (int nr = r + 1, nf = f + 1; nr < 7 && nf < 7; ++nr, ++nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
-    for (int nr = r - 1, nf = f + 1; nr > 0 && nf < 7; --nr, ++nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
-    for (int nr = r + 1, nf = f - 1; nr < 7 && nf > 0; ++nr, --nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
-    for (int nr = r - 1, nf = f - 1; nr > 0 && nf > 0; --nr, --nf) mask |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
+    Rank r = rank_of(s);
+    File f = file_of(s);
+    {
+        Rank nr = r + 1; File nf = f + 1;
+        for (; nr < RANK_8 && nf < FILE_H; ++nr, ++nf) mask |= make_square(nf, nr);
+    }
+    {
+        Rank nr = r - 1; File nf = f + 1;
+        for (; nr > RANK_1 && nf < FILE_H; --nr, ++nf) mask |= make_square(nf, nr);
+    }
+    {
+        Rank nr = r + 1; File nf = f - 1;
+        for (; nr < RANK_8 && nf > FILE_A; ++nr, --nf) mask |= make_square(nf, nr);
+    }
+    {
+        Rank nr = r - 1; File nf = f - 1;
+        for (; nr > RANK_1 && nf > FILE_A; --nr, --nf) mask |= make_square(nf, nr);
+    }
     return mask;
 }
 
-Bitboard rook_attacks_on_the_fly(Square s, Bitboard occ) {
+constexpr Bitboard rook_attacks_on_the_fly(Square s, Bitboard occ) {
     Bitboard attacks = 0;
-    int r = std::to_underlying(rank_of(s));
-    int f = std::to_underlying(file_of(s));
+    Rank r = rank_of(s);
+    File f = file_of(s);
     
     // North
-    for (int nr = r + 1; nr < 8; ++nr) {
-        Square sq = make_square(static_cast<File>(f), static_cast<Rank>(nr));
+    for (Rank nr = r + 1; nr < RANK_NB; ++nr) {
+        Square sq = make_square(f, nr);
         attacks |= square_bb(sq);
         if (occ & sq) break;
     }
     // South
-    for (int nr = r - 1; nr >= 0; --nr) {
-        Square sq = make_square(static_cast<File>(f), static_cast<Rank>(nr));
+    for (Rank nr = r - 1; nr >= RANK_1; --nr) {
+        Square sq = make_square(f, nr);
         attacks |= square_bb(sq);
         if (occ & sq) break;
     }
     // East
-    for (int nf = f + 1; nf < 8; ++nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(r));
+    for (File nf = f + 1; nf < FILE_NB; ++nf) {
+        Square sq = make_square(nf, r);
         attacks |= square_bb(sq);
         if (occ & sq) break;
     }
     // West
-    for (int nf = f - 1; nf >= 0; --nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(r));
+    for (File nf = f - 1; nf >= FILE_A; --nf) {
+        Square sq = make_square(nf, r);
         attacks |= square_bb(sq);
         if (occ & sq) break;
     }
     return attacks;
 }
 
-Bitboard bishop_attacks_on_the_fly(Square s, Bitboard occ) {
+constexpr Bitboard bishop_attacks_on_the_fly(Square s, Bitboard occ) {
     Bitboard attacks = 0;
-    int r = std::to_underlying(rank_of(s));
-    int f = std::to_underlying(file_of(s));
+    Rank r = rank_of(s);
+    File f = file_of(s);
     
     // NE
-    for (int nr = r + 1, nf = f + 1; nr < 8 && nf < 8; ++nr, ++nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(nr));
-        attacks |= square_bb(sq);
-        if (occ & sq) break;
+    {
+        Rank nr = r + 1; File nf = f + 1;
+        for (; nr < RANK_NB && nf < FILE_NB; ++nr, ++nf) {
+            Square sq = make_square(nf, nr);
+            attacks |= square_bb(sq);
+            if (occ & sq) break;
+        }
     }
     // SE
-    for (int nr = r - 1, nf = f + 1; nr >= 0 && nf < 8; --nr, ++nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(nr));
-        attacks |= square_bb(sq);
-        if (occ & sq) break;
+    {
+        Rank nr = r - 1; File nf = f + 1;
+        for (; nr >= RANK_1 && nf < FILE_NB; --nr, ++nf) {
+            Square sq = make_square(nf, nr);
+            attacks |= square_bb(sq);
+            if (occ & sq) break;
+        }
     }
     // NW
-    for (int nr = r + 1, nf = f - 1; nr < 8 && nf >= 0; ++nr, --nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(nr));
-        attacks |= square_bb(sq);
-        if (occ & sq) break;
+    {
+        Rank nr = r + 1; File nf = f - 1;
+        for (; nr < RANK_NB && nf >= FILE_A; ++nr, --nf) {
+            Square sq = make_square(nf, nr);
+            attacks |= square_bb(sq);
+            if (occ & sq) break;
+        }
     }
     // SW
-    for (int nr = r - 1, nf = f - 1; nr >= 0 && nf >= 0; --nr, --nf) {
-        Square sq = make_square(static_cast<File>(nf), static_cast<Rank>(nr));
-        attacks |= square_bb(sq);
-        if (occ & sq) break;
+    {
+        Rank nr = r - 1; File nf = f - 1;
+        for (; nr >= RANK_1 && nf >= FILE_A; --nr, --nf) {
+            Square sq = make_square(nf, nr);
+            attacks |= square_bb(sq);
+            if (occ & sq) break;
+        }
     }
     return attacks;
 }

@@ -208,6 +208,11 @@ ENABLE_INCR_OPERATORS_ON(Rank)
 constexpr inline Square& operator+=(Square& s, Direction d) { return s = s + d; }
 constexpr inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
 
+[[nodiscard]] constexpr inline File operator+(File f, int i) { return static_cast<File>(std::to_underlying(f) + i); }
+[[nodiscard]] constexpr inline File operator-(File f, int i) { return static_cast<File>(std::to_underlying(f) - i); }
+[[nodiscard]] constexpr inline Rank operator+(Rank r, int i) { return static_cast<Rank>(std::to_underlying(r) + i); }
+[[nodiscard]] constexpr inline Rank operator-(Rank r, int i) { return static_cast<Rank>(std::to_underlying(r) - i); }
+
 // Toggle color (WHITE <-> BLACK)
 [[nodiscard]] constexpr Color operator~(Color c) { 
     return static_cast<Color>(std::to_underlying(c) ^ BLACK); 
