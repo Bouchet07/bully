@@ -162,12 +162,10 @@ constexpr Bitboard bishop_attacks_on_the_fly(Square s, Bitboard occ) {
     return attacks;
 }
 
-Bitboard reconstruct_occupancy(int index, Bitboard mask) {
+constexpr Bitboard reconstruct_occupancy(int index, Bitboard mask) {
     Bitboard occ = 0;
-    int bit_count = popcnt(mask);
-    for (int j = 0; j < bit_count; ++j) {
-        Square sq = get_LSB(mask);
-        mask ^= sq;
+    for (int j = 0; mask; ++j) {
+        Square sq = pop_lsb(mask);
         if (index & (1 << j)) {
             occ |= sq;
         }
