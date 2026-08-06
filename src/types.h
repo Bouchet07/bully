@@ -177,8 +177,8 @@ enum Rank : int8_t {
 
 // Enable standard ++ and -- operators using C++23 std::to_underlying
 #define ENABLE_INCR_OPERATORS_ON(T) \
-    inline T& operator++(T& d) { return d = static_cast<T>(std::to_underlying(d) + 1); } \
-    inline T& operator--(T& d) { return d = static_cast<T>(std::to_underlying(d) - 1); }
+    constexpr inline T& operator++(T& d) { return d = static_cast<T>(std::to_underlying(d) + 1); } \
+    constexpr inline T& operator--(T& d) { return d = static_cast<T>(std::to_underlying(d) - 1); }
 
 ENABLE_INCR_OPERATORS_ON(PieceType)
 ENABLE_INCR_OPERATORS_ON(Color)
@@ -205,8 +205,8 @@ ENABLE_INCR_OPERATORS_ON(Rank)
     return static_cast<Square>(std::to_underlying(s) - std::to_underlying(d)); 
 }
 
-inline Square& operator+=(Square& s, Direction d) { return s = s + d; }
-inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
+constexpr inline Square& operator+=(Square& s, Direction d) { return s = s + d; }
+constexpr inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
 
 // Toggle color (WHITE <-> BLACK)
 [[nodiscard]] constexpr Color operator~(Color c) { 

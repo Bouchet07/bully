@@ -7,8 +7,7 @@ namespace Bully {
 
 [[nodiscard]] constexpr std::array<Bitboard, SQUARE_NB> generate_knight_attacks() {
     std::array<Bitboard, SQUARE_NB> attacks{};
-    for (int i = 0; i < 64; ++i) {
-        Square s = static_cast<Square>(i);
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         Bitboard b = square_bb(s);
         Bitboard knight = 0;
         knight |= shift<NORTH + NORTH + EAST>(b);
@@ -19,31 +18,29 @@ namespace Bully {
         knight |= shift<NORTH + WEST + WEST>(b);
         knight |= shift<SOUTH + EAST + EAST>(b);
         knight |= shift<SOUTH + WEST + WEST>(b);
-        attacks[static_cast<size_t>(i)] = knight;
+        attacks[to_index(s)] = knight;
     }
     return attacks;
 }
 
 [[nodiscard]] constexpr std::array<Bitboard, SQUARE_NB> generate_king_attacks() {
     std::array<Bitboard, SQUARE_NB> attacks{};
-    for (int i = 0; i < 64; ++i) {
-        Square s = static_cast<Square>(i);
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         Bitboard b = square_bb(s);
         Bitboard king = 0;
         king |= shift<NORTH>(b) | shift<SOUTH>(b) | shift<EAST>(b) | shift<WEST>(b);
         king |= shift<NORTH_EAST>(b) | shift<NORTH_WEST>(b) | shift<SOUTH_EAST>(b) | shift<SOUTH_WEST>(b);
-        attacks[static_cast<size_t>(i)] = king;
+        attacks[to_index(s)] = king;
     }
     return attacks;
 }
 
 [[nodiscard]] constexpr std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> generate_pawn_attacks() {
     std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> attacks{};
-    for (int i = 0; i < 64; ++i) {
-        Square s = static_cast<Square>(i);
+    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
         Bitboard b = square_bb(s);
-        attacks[WHITE][static_cast<size_t>(i)] = shift<NORTH_EAST>(b) | shift<NORTH_WEST>(b);
-        attacks[BLACK][static_cast<size_t>(i)] = shift<SOUTH_EAST>(b) | shift<SOUTH_WEST>(b);
+        attacks[to_index(WHITE)][to_index(s)] = shift<NORTH_EAST>(b) | shift<NORTH_WEST>(b);
+        attacks[to_index(BLACK)][to_index(s)] = shift<SOUTH_EAST>(b) | shift<SOUTH_WEST>(b);
     }
     return attacks;
 }
