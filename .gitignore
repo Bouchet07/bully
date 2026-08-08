@@ -44,6 +44,9 @@
 .vs/*
 out/*
 build/
+build-*/
+cmake_test_discovery_*.json
+Pyrrhic/tbconfig.h
 
 # Bully tournament results, logs, and testing binaries
 engines/

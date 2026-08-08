@@ -201,6 +201,8 @@ uint64_t find_magic(Square s, bool is_rook, Bitboard mask, int shift, Bitboard* 
         std::fill(test_table.begin(), test_table.end(), 0);
         bool fail = false;
         for (size_t i = 0; i < num_occupancies; ++i) {
+            // in this case as occupancies[i] was reconstructed from the mask,
+            //we could use it directly to compute the key, avoiding & mask, kept for ideomatic clarity
             uint64_t key = ((occupancies[i] & mask) * candidate) >> shift;
             if (test_table[key] != 0 && test_table[key] != attacks[i]) {
                 fail = true;
