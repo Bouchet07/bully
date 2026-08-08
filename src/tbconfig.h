@@ -1,21 +1,16 @@
 #pragma once
 
-#include <bit>
 #include <cstdint>
+#include <utility>
 #include "types.h"
+#include "bitboard.h"
 #include "attacks.h"
 
-#define PYRRHIC_POPCOUNT(x)              (std::popcount(static_cast<uint64_t>(x)))
-#define PYRRHIC_LSB(x)                   (std::countr_zero(static_cast<uint64_t>(x)))
-#define PYRRHIC_POPLSB(x)                (pyrrhic_poplsb(x))
+#define PYRRHIC_POPCOUNT(x)              (Bully::popcnt(x))
+#define PYRRHIC_LSB(x)                   (std::to_underlying(Bully::lsb(x)))
+#define PYRRHIC_POPLSB(x)                (std::to_underlying(Bully::pop_lsb(*(x))))
 
-inline int pyrrhic_poplsb(uint64_t* bb) {
-    int lsb = std::countr_zero(*bb);
-    *bb &= *bb - 1;
-    return lsb;
-}
-
-#define PYRRHIC_PAWN_ATTACKS(sq, c)      (Bully::pawn_attacks(static_cast<Bully::Color>(1 - (c)), static_cast<Bully::Square>(sq)))
+#define PYRRHIC_PAWN_ATTACKS(sq, c)      (Bully::pawn_attacks(~static_cast<Bully::Color>(c), static_cast<Bully::Square>(sq)))
 #define PYRRHIC_KNIGHT_ATTACKS(sq)       (Bully::knight_attacks(static_cast<Bully::Square>(sq)))
 #define PYRRHIC_BISHOP_ATTACKS(sq, occ)  (Bully::bishop_attacks(static_cast<Bully::Square>(sq), occ))
 #define PYRRHIC_ROOK_ATTACKS(sq, occ)    (Bully::rook_attacks(static_cast<Bully::Square>(sq), occ))
