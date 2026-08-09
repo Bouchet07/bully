@@ -20,11 +20,11 @@ protected:
 TEST_F(NNUETest, FeatureIndexBounds) {
     // Feature index for e2 pawn from White's perspective
     size_t idx_w = NNUE::feature_index(WHITE, SQ_E1, W_PAWN, SQ_E2);
-    EXPECT_LT(idx_w, NNUE::HALFKP_FEATURES);
+    EXPECT_LT(idx_w, NNUE::HalfKPFeatures);
 
     // Feature index for e7 pawn from Black's perspective
     size_t idx_b = NNUE::feature_index(BLACK, SQ_E8, B_PAWN, SQ_E7);
-    EXPECT_LT(idx_b, NNUE::HALFKP_FEATURES);
+    EXPECT_LT(idx_b, NNUE::HalfKPFeatures);
 }
 
 TEST_F(NNUETest, LoadNonExistentFile) {
