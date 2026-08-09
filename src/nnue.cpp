@@ -183,10 +183,11 @@ static void update_accumulator(const Position& pos, Accumulator& acc, Color c) {
     }
 
     const StateInfo* st = pos.state();
-    std::vector<const StateInfo*> chain;
+    std::array<const StateInfo*, MAX_PLY> chain;
+    size_t chain_len = 0;
 
-    while (st && st->accumulator && !st->accumulator->computed[to_index(c)]) {
-        chain.push_back(st);
+    while (st && st->accumulator && !st->accumulator->computed[to_index(c)] && chain_len < MAX_PLY) {
+        chain[chain_len++] = st;
         st = st->previous;
     }
 
@@ -200,8 +201,8 @@ static void update_accumulator(const Position& pos, Accumulator& acc, Color c) {
         Square ksq = pos.king_square(c);
         int16_t* target_acc = (c == WHITE) ? acc.white.data() : acc.black.data();
 
-        for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-            const DirtyPiece& dp = (*it)->dirty_piece;
+        for (size_t idx_chain = chain_len; idx_chain > 0; --idx_chain) {
+            const DirtyPiece& dp = chain[idx_chain - 1]->dirty_piece;
             for (int i = 0; i < dp.count; ++i) {
                 Piece pc = dp.piece[i];
                 if (dp.from[i] != SQ_NONE) {
