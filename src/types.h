@@ -86,53 +86,46 @@ constexpr std::string_view BINARY_NAME    = "bully";
     #define USE_PEXT
 #endif
 
-constexpr bool HasPext =
 #ifdef USE_PEXT
-    true;
+constexpr bool HasPext = true;
 #else
-    false;
+constexpr bool HasPext = false;
 #endif
 
-constexpr bool HasVNNI =
 #ifdef USE_VNNI
-    true;
+constexpr bool HasVNNI = true;
 #else
-    false;
+constexpr bool HasVNNI = false;
 #endif
 
-constexpr bool HasDotProd =
 #ifdef USE_DOTPROD
-    true;
+constexpr bool HasDotProd = true;
 #else
-    false;
+constexpr bool HasDotProd = false;
 #endif
 
-constexpr bool HasAVX512 =
 #if defined(__AVX512F__) || defined(__AVX512BW__)
-    true;
+constexpr bool HasAVX512 = true;
 #else
-    false;
+constexpr bool HasAVX512 = false;
 #endif
 
-constexpr bool HasAVX2 =
 #if defined(__AVX2__)
-    true;
+constexpr bool HasAVX2 = true;
 #else
-    false;
+constexpr bool HasAVX2 = false;
 #endif
 
-constexpr bool HasSSE42 =
 #if defined(__SSE4_2__)
-    true;
+constexpr bool HasSSE42 = true;
 #else
-    false;
+constexpr bool HasSSE42 = false;
 #endif
 
-constexpr bool HasNeon =
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-    true;
+constexpr bool HasNeon = true;
 #else
-    false;
+constexpr bool HasNeon = false;
 #endif
 
 constexpr std::string_view UCI_OPTIONS    = "option name Hash type spin default 16 min 1 max 2048\noption name Clear Hash type button\noption name Threads type spin default 1 min -1 max 128\noption name SyzygyPath type string default syzygy\noption name UseNNUE type check default false\noption name EvalFile type string default nn-7821938.nnue\noption name MultiPV type spin default 1 min 1 max 128\noption name NullMovePruning type check default true\noption name LateMoveReduction type check default true\noption name ReverseFutilityPruning type check default true\noption name LateMovePruning type check default true\noption name FutilityPruning type check default true\noption name CheckExtensions type check default true\noption name SingularExtensions type check default true\noption name AspirationWindow type check default true\noption name QuiescenceSearch type check default true\noption name UseTT type check default true\noption name KillerHeuristic type check default true\noption name HistoryHeuristic type check default true\noption name Ponder type check default false";
