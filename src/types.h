@@ -70,15 +70,33 @@ constexpr std::string_view BINARY_NAME    = "bully";
     constexpr std::string_view TargetOS = "POSIX / Generic OS";
 #endif
 
-// Compiler Detection
-#if defined(__clang__)
+// Compiler Detection (CMake Override or Preprocessor Fallback)
+#if defined(BUILD_COMPILER_NAME)
+    constexpr std::string_view CompilerName = BUILD_COMPILER_NAME;
+#elif defined(COMPILER_NAME)
+    constexpr std::string_view CompilerName = COMPILER_NAME;
+#elif defined(__clang__)
     constexpr std::string_view CompilerName = "Clang";
 #elif defined(__GNUC__)
     constexpr std::string_view CompilerName = "GCC";
 #elif defined(_MSC_VER)
     constexpr std::string_view CompilerName = "MSVC";
 #else
-    constexpr std::string_view CompilerName = "Unknown";
+    constexpr std::string_view CompilerName = "Unknown Compiler";
+#endif
+
+// Architecture Profile Name (CMake Override or Fallback)
+#if defined(BUILD_ARCH_NAME)
+    constexpr std::string_view BuildArchName = BUILD_ARCH_NAME;
+#else
+    constexpr std::string_view BuildArchName = "native";
+#endif
+
+// Compilation Flags (CMake Override or Fallback)
+#if defined(BUILD_FLAGS_STR)
+    constexpr std::string_view BuildFlagsStr = BUILD_FLAGS_STR;
+#else
+    constexpr std::string_view BuildFlagsStr = "-O3 -flto";
 #endif
 
 // Hardware Feature Detection Flags

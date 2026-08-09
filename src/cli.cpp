@@ -91,8 +91,8 @@ void print_banner(bool use_utf8) {
     std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
     std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
 
-    std::cout << std::format("  {}Compiler{}     : {}{}{}\n", style.green, style.reset, style.magenta, COMPILER_NAME, style.reset);
-    std::cout << std::format("  {}Build{}        : {}{}{}\n", style.green, style.reset, style.magenta, BUILD_ARCH_NAME, style.reset);
+    std::cout << std::format("  {}Compiler{}     : {}{}{}\n", style.green, style.reset, style.magenta, CompilerName, style.reset);
+    std::cout << std::format("  {}Build{}        : {}{}{}\n", style.green, style.reset, style.magenta, BuildArchName, style.reset);
     std::cout << style.blue << "========================================================\n" << style.reset;
     std::cout << std::format("  Type '{}help{}' for custom CLI commands, or '{}uci{}' for GUI.\n", style.yellow, style.reset, style.yellow, style.reset);
     std::cout << style.blue << "========================================================\n\n" << style.reset;
