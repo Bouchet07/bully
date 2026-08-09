@@ -25,16 +25,16 @@ namespace NNUE {
 // ============================================================================
 // NNUE Architecture Constants (HalfKP 256x2-32-32-1)
 // ============================================================================
-constexpr size_t TRANSFORMER_HALF_DIM  = 256;
-constexpr size_t L1_DIM                 = 32;
-constexpr size_t PIECE_SQUARE_FEATURES  = 64 * 10; // 10 non-king piece types * 64 squares = 640
-constexpr size_t HALFKP_FEATURES        = 64 * PIECE_SQUARE_FEATURES; // 64 king squares * 640 = 40,960
-constexpr uint32_t NNUE_VERSION         = 0x7AF32F16; // Standard HalfKP NNUE version magic
+constexpr size_t TransformerHalfDim = 256;
+constexpr size_t L1Dim              = 32;
+constexpr size_t PieceSquareFeatures = 64 * 10; // 10 non-king piece types * 64 squares = 640
+constexpr size_t HalfKPFeatures     = 64 * PieceSquareFeatures; // 64 king squares * 640 = 40,960
+constexpr uint32_t NnueVersionMagic  = 0x7AF32F16; // Standard HalfKP NNUE version magic
 
 // SIMD 64-byte Cache-Aligned Accumulator for 256 16-bit values per perspective
 struct alignas(64) Accumulator {
-    std::array<int16_t, TRANSFORMER_HALF_DIM> white;
-    std::array<int16_t, TRANSFORMER_HALF_DIM> black;
+    std::array<int16_t, TransformerHalfDim> white;
+    std::array<int16_t, TransformerHalfDim> black;
     std::array<bool, 2> computed = {false, false};
 };
 
@@ -63,7 +63,7 @@ void init();
     size_t color_offset = (pc_color == perspective) ? 0 : 1;
     size_t piece_idx = color_offset * 5 + (to_index(pt) - 1);
     size_t piece_sq_idx = piece_idx * 64 + to_index(rel_sq);
-    return to_index(rel_ksq) * PIECE_SQUARE_FEATURES + piece_sq_idx;
+    return to_index(rel_ksq) * PieceSquareFeatures + piece_sq_idx;
 }
 
 // Compute full accumulator refresh for a position
