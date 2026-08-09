@@ -1024,22 +1024,12 @@ bool UCI::execute_line(const std::string& line) {
             #endif
 
             std::string simds;
-            #ifdef USE_PEXT
-                simds += (simds.empty() ? "" : ", ") + std::string("PEXT (BMI2)");
-            #endif
-            #ifdef USE_VNNI
-                simds += (simds.empty() ? "" : ", ") + std::string("VNNI (Neural Math)");
-            #endif
-            #ifdef USE_DOTPROD
-                simds += (simds.empty() ? "" : ", ") + std::string("ARM DotProduct");
-            #endif
-            #if defined(__AVX512F__) || defined(__AVX512BW__)
-                simds += (simds.empty() ? "" : ", ") + std::string("AVX-512");
-            #elif defined(__AVX2__)
-                simds += (simds.empty() ? "" : ", ") + std::string("AVX2");
-            #elif defined(__SSE4_2__)
-                simds += (simds.empty() ? "" : ", ") + std::string("SSE4.2");
-            #endif
+            if constexpr (HasPext)    simds += (simds.empty() ? "" : ", ") + std::string("PEXT (BMI2)");
+            if constexpr (HasVNNI)    simds += (simds.empty() ? "" : ", ") + std::string("VNNI (Neural Math)");
+            if constexpr (HasDotProd) simds += (simds.empty() ? "" : ", ") + std::string("ARM DotProduct");
+            if constexpr (HasAVX512)  simds += (simds.empty() ? "" : ", ") + std::string("AVX-512");
+            else if constexpr (HasAVX2)  simds += (simds.empty() ? "" : ", ") + std::string("AVX2");
+            else if constexpr (HasSSE42) simds += (simds.empty() ? "" : ", ") + std::string("SSE4.2");
             if (simds.empty()) simds = "Base 64-bit SIMD";
 
             unsigned int hw_cores = std::thread::hardware_concurrency();

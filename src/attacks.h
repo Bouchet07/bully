@@ -50,22 +50,10 @@ void init_attacks();
     return PawnAttacks[to_index(c)][to_index(s)]; 
 }
 
-#ifdef USE_PEXT
 // PEXT-based sliding attacks (ultra-fast)
 extern std::array<std::array<Bitboard, 4096>, SQUARE_NB> RookAttacks;
 extern std::array<std::array<Bitboard, 512>, SQUARE_NB> BishopAttacks;
 
-[[nodiscard]] inline Bitboard rook_attacks(Square s, Bitboard occ) {
-    size_t idx = to_index(s);
-    return RookAttacks[idx][_pext_u64(occ, RookMasks[idx])];
-}
-
-[[nodiscard]] inline Bitboard bishop_attacks(Square s, Bitboard occ) {
-    size_t idx = to_index(s);
-    return BishopAttacks[idx][_pext_u64(occ, BishopMasks[idx])];
-}
-
-#else
 // Magic-based sliding attacks (highly portable fallback)
 extern std::array<Bitboard, 0x19000> RookAttackTable;
 extern std::array<Bitboard, 0x1480> BishopAttackTable;
@@ -81,18 +69,33 @@ extern std::array<int, SQUARE_NB> BishopOffsets;
 
 [[nodiscard]] inline Bitboard rook_attacks(Square s, Bitboard occ) {
     size_t idx = to_index(s);
-    Bitboard m = RookMasks[idx];
-    uint64_t key = ((occ & m) * RookMagics[idx]) >> RookShifts[idx];
-    return RookAttackTable[static_cast<size_t>(RookOffsets[idx]) + key];
+    if constexpr (HasPext) {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+        return RookAttacks[idx][_pext_u64(occ, RookMasks[idx])];
+#else
+        return RookAttacks[idx][0];
+#endif
+    } else {
+        Bitboard m = RookMasks[idx];
+        uint64_t key = ((occ & m) * RookMagics[idx]) >> RookShifts[idx];
+        return RookAttackTable[static_cast<size_t>(RookOffsets[idx]) + key];
+    }
 }
 
 [[nodiscard]] inline Bitboard bishop_attacks(Square s, Bitboard occ) {
     size_t idx = to_index(s);
-    Bitboard m = BishopMasks[idx];
-    uint64_t key = ((occ & m) * BishopMagics[idx]) >> BishopShifts[idx];
-    return BishopAttackTable[static_cast<size_t>(BishopOffsets[idx]) + key];
-}
+    if constexpr (HasPext) {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+        return BishopAttacks[idx][_pext_u64(occ, BishopMasks[idx])];
+#else
+        return BishopAttacks[idx][0];
 #endif
+    } else {
+        Bitboard m = BishopMasks[idx];
+        uint64_t key = ((occ & m) * BishopMagics[idx]) >> BishopShifts[idx];
+        return BishopAttackTable[static_cast<size_t>(BishopOffsets[idx]) + key];
+    }
+}
 
 // Queen attacks are simply rook + bishop attacks
 [[nodiscard]] inline Bitboard queen_attacks(Square s, Bitboard occ) {

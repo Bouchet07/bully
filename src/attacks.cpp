@@ -54,11 +54,10 @@ constexpr std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> PawnAttacks = ge
 std::array<Bitboard, SQUARE_NB> RookMasks;
 std::array<Bitboard, SQUARE_NB> BishopMasks;
 
-#ifdef USE_PEXT
 // PEXT sliding attack tables
 std::array<std::array<Bitboard, 4096>, SQUARE_NB> RookAttacks;
 std::array<std::array<Bitboard, 512>, SQUARE_NB> BishopAttacks;
-#else
+
 // Magic sliding attack tables fallback
 std::array<Bitboard, 0x19000> RookAttackTable;
 std::array<Bitboard, 0x1480> BishopAttackTable;
@@ -71,7 +70,6 @@ std::array<uint8_t, SQUARE_NB> BishopShifts;
 
 std::array<int, SQUARE_NB> RookOffsets;
 std::array<int, SQUARE_NB> BishopOffsets;
-#endif
 
 // On-the-fly generators for initialization
 constexpr Bitboard rook_mask(Square s) {
@@ -178,7 +176,6 @@ uint64_t random_uint64_sparse(std::mt19937_64& rng) {
     return rng() & rng() & rng();
 }
 
-#ifndef USE_PEXT
 // Find a magic number for a square and piece type at startup
 uint64_t find_magic(Square s, bool is_rook, Bitboard mask, int shift, Bitboard* attack_table_dest) {
     std::mt19937_64 rng(10283921ULL ^ to_index(s) ^ (is_rook ? 1ULL : 0ULL));
@@ -220,7 +217,6 @@ uint64_t find_magic(Square s, bool is_rook, Bitboard mask, int shift, Bitboard* 
         }
     }
 }
-#endif
 
 void init_attacks() {
     // 1. Precompute masks
@@ -230,42 +226,42 @@ void init_attacks() {
     }
 
     // 3. Precompute sliding attacks
-#ifdef USE_PEXT
-    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
-        size_t idx = to_index(s);
-        Bitboard r_mask = RookMasks[idx];
-        int r_bits = popcnt(r_mask);
-        for (size_t i = 0; i < (1ULL << r_bits); ++i) {
-            Bitboard occ = reconstruct_occupancy(i, r_mask);
-            RookAttacks[idx][i] = rook_attacks_on_the_fly(s, occ);
-        }
+    if constexpr (HasPext) {
+        for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
+            size_t idx = to_index(s);
+            Bitboard r_mask = RookMasks[idx];
+            int r_bits = popcnt(r_mask);
+            for (size_t i = 0; i < (1ULL << r_bits); ++i) {
+                Bitboard occ = reconstruct_occupancy(i, r_mask);
+                RookAttacks[idx][i] = rook_attacks_on_the_fly(s, occ);
+            }
 
-        Bitboard b_mask = BishopMasks[idx];
-        int b_bits = popcnt(b_mask);
-        for (size_t i = 0; i < (1ULL << b_bits); ++i) {
-            Bitboard occ = reconstruct_occupancy(i, b_mask);
-            BishopAttacks[idx][i] = bishop_attacks_on_the_fly(s, occ);
+            Bitboard b_mask = BishopMasks[idx];
+            int b_bits = popcnt(b_mask);
+            for (size_t i = 0; i < (1ULL << b_bits); ++i) {
+                Bitboard occ = reconstruct_occupancy(i, b_mask);
+                BishopAttacks[idx][i] = bishop_attacks_on_the_fly(s, occ);
+            }
+        }
+    } else {
+        size_t rook_offset = 0;
+        size_t bishop_offset = 0;
+
+        for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
+            size_t idx = to_index(s);
+            RookOffsets[idx] = static_cast<int>(rook_offset);
+            int r_bits = popcnt(RookMasks[idx]);
+            RookShifts[idx] = static_cast<uint8_t>(64 - r_bits);
+            RookMagics[idx] = find_magic(s, true, RookMasks[idx], RookShifts[idx], &RookAttackTable[rook_offset]);
+            rook_offset += (1ULL << r_bits);
+
+            BishopOffsets[idx] = static_cast<int>(bishop_offset);
+            int b_bits = popcnt(BishopMasks[idx]);
+            BishopShifts[idx] = static_cast<uint8_t>(64 - b_bits);
+            BishopMagics[idx] = find_magic(s, false, BishopMasks[idx], BishopShifts[idx], &BishopAttackTable[bishop_offset]);
+            bishop_offset += (1ULL << b_bits);
         }
     }
-#else
-    size_t rook_offset = 0;
-    size_t bishop_offset = 0;
-
-    for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
-        size_t idx = to_index(s);
-        RookOffsets[idx] = static_cast<int>(rook_offset);
-        int r_bits = popcnt(RookMasks[idx]);
-        RookShifts[idx] = static_cast<uint8_t>(64 - r_bits);
-        RookMagics[idx] = find_magic(s, true, RookMasks[idx], RookShifts[idx], &RookAttackTable[rook_offset]);
-        rook_offset += (1ULL << r_bits);
-
-        BishopOffsets[idx] = static_cast<int>(bishop_offset);
-        int b_bits = popcnt(BishopMasks[idx]);
-        BishopShifts[idx] = static_cast<uint8_t>(64 - b_bits);
-        BishopMagics[idx] = find_magic(s, false, BishopMasks[idx], BishopShifts[idx], &BishopAttackTable[bishop_offset]);
-        bishop_offset += (1ULL << b_bits);
-    }
-#endif
 }
 
 } // namespace Bully

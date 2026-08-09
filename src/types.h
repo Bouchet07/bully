@@ -32,6 +32,95 @@ constexpr std::string_view BINARY_NAME    = "bully.exe";
 #else
 constexpr std::string_view BINARY_NAME    = "bully";
 #endif
+
+// ============================================================================
+// System, Compiler & Hardware Feature Detection (constexpr Feature Table)
+// ============================================================================
+
+// OS Detection
+#if defined(_WIN32) || defined(_WIN64)
+    constexpr bool IsWindows = true;
+    constexpr bool IsLinux   = false;
+    constexpr bool IsAndroid = false;
+#elif defined(__ANDROID__)
+    constexpr bool IsWindows = false;
+    constexpr bool IsLinux   = true;
+    constexpr bool IsAndroid = true;
+#elif defined(__linux__)
+    constexpr bool IsWindows = false;
+    constexpr bool IsLinux   = true;
+    constexpr bool IsAndroid = false;
+#else
+    constexpr bool IsWindows = false;
+    constexpr bool IsLinux   = false;
+    constexpr bool IsAndroid = false;
+#endif
+
+// Compiler Detection
+#if defined(__clang__)
+    constexpr std::string_view CompilerName = "Clang";
+#elif defined(__GNUC__)
+    constexpr std::string_view CompilerName = "GCC";
+#elif defined(_MSC_VER)
+    constexpr std::string_view CompilerName = "MSVC";
+#else
+    constexpr std::string_view CompilerName = "Unknown";
+#endif
+
+// Hardware Feature Detection Flags
+#if !defined(USE_PEXT) && defined(__BMI2__)
+    #define USE_PEXT
+#endif
+
+constexpr bool HasPext =
+#ifdef USE_PEXT
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasVNNI =
+#ifdef USE_VNNI
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasDotProd =
+#ifdef USE_DOTPROD
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasAVX512 =
+#if defined(__AVX512F__) || defined(__AVX512BW__)
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasAVX2 =
+#if defined(__AVX2__)
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasSSE42 =
+#if defined(__SSE4_2__)
+    true;
+#else
+    false;
+#endif
+
+constexpr bool HasNeon =
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    true;
+#else
+    false;
+#endif
+
 constexpr std::string_view UCI_OPTIONS    = "option name Hash type spin default 16 min 1 max 2048\noption name Clear Hash type button\noption name Threads type spin default 1 min -1 max 128\noption name SyzygyPath type string default syzygy\noption name UseNNUE type check default false\noption name EvalFile type string default nn-7821938.nnue\noption name MultiPV type spin default 1 min 1 max 128\noption name NullMovePruning type check default true\noption name LateMoveReduction type check default true\noption name ReverseFutilityPruning type check default true\noption name LateMovePruning type check default true\noption name FutilityPruning type check default true\noption name CheckExtensions type check default true\noption name SingularExtensions type check default true\noption name AspirationWindow type check default true\noption name QuiescenceSearch type check default true\noption name UseTT type check default true\noption name KillerHeuristic type check default true\noption name HistoryHeuristic type check default true\noption name Ponder type check default false";
 
 /// 64-bit Zobrist position hash key
