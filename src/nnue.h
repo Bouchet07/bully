@@ -25,11 +25,16 @@ namespace NNUE {
 // ============================================================================
 // NNUE Architecture Constants (HalfKP 256x2-32-32-1)
 // ============================================================================
-constexpr size_t TransformerHalfDim = 256;
-constexpr size_t L1Dim              = 32;
+constexpr size_t TransformerHalfDim  = 256;
+constexpr size_t L1Dim               = 32;
 constexpr size_t PieceSquareFeatures = 64 * 10; // 10 non-king piece types * 64 squares = 640
-constexpr size_t HalfKPFeatures     = 64 * PieceSquareFeatures; // 64 king squares * 640 = 40,960
+constexpr size_t HalfKPFeatures      = 64 * PieceSquareFeatures; // 64 king squares * 640 = 40,960
 constexpr uint32_t NnueVersionMagic  = 0x7AF32F16; // Standard HalfKP NNUE version magic
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
+#endif
 
 // SIMD 64-byte Cache-Aligned Accumulator for 256 16-bit values per perspective
 struct alignas(64) Accumulator {
@@ -37,6 +42,10 @@ struct alignas(64) Accumulator {
     std::array<int16_t, TransformerHalfDim> black;
     std::array<bool, 2> computed = {false, false};
 };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 // Global NNUE Configuration Options
 extern bool use_nnue;

@@ -70,16 +70,20 @@ inline bool& use_history = config.history;
 // Quiet & Capture Move Ordering heuristic tables shared across all search threads
 struct SharedHeuristics {
     // 1D History: [Piece][ToSquare]
-    std::array<std::array<std::atomic<int>, 64>, 16> history{};
+    std::array<std::array<std::atomic<int>, 64>, 16> history;
 
     // 1-ply Continuation History: [PiecePrev * 64 + ToSqPrev][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_1{};
+    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_1;
 
     // 2-ply Continuation History: [PiecePrev2 * 64 + ToSqPrev2][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_2{};
+    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_2;
 
     // Capture History: [Piece][ToSquare][VictimPieceType]
-    std::array<std::array<std::array<std::atomic<int>, 8>, 64>, 16> capture_history{};
+    std::array<std::array<std::array<std::atomic<int>, 8>, 64>, 16> capture_history;
+
+    SharedHeuristics() {
+        clear();
+    }
 
     void clear() {
         for (auto& row : history) {

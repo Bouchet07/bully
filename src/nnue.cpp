@@ -3,14 +3,15 @@
 #include "bitboard.h"
 #include <iostream>
 #include <fstream>
-#include <format>
 #include <algorithm>
 #include <vector>
 #include <cstring>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
     #include <immintrin.h>
-#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+#endif
+
+#if defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(__aarch64__) || defined(_M_ARM64)
     #include <arm_neon.h>
 #endif
 
@@ -20,6 +21,11 @@ namespace NNUE {
 bool use_nnue = false;
 std::string eval_file = "nn-7821938.nnue";
 static bool net_loaded = false;
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // structure was padded due to alignment specifier
+#endif
 
 // ============================================================================
 // Network Weights Structure (HalfKP 256x2-32-32-1)
@@ -39,71 +45,299 @@ struct NetworkWeights {
     }
 } static net_weights;
 
-// Helper function to vector-add feature weights to accumulator
-static inline void vec_add(int16_t* acc, const int16_t* weights) {
-    if constexpr (HasAVX512) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        for (int i = 0; i < 8; ++i) {
-            __m512i a = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
-            __m512i w = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
-            _mm512_storeu_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_add_epi16(a, w));
-        }
+#if defined(_MSC_VER)
+#pragma warning(pop)
 #endif
-    } else if constexpr (HasAVX2) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        for (int i = 0; i < 16; ++i) {
-            __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
-            __m256i w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_add_epi16(a, w));
-        }
-#endif
-    } else if constexpr (HasNeon) {
-#if defined(__ARM_NEON) || defined(__ARM_NEON__)
-        for (int i = 0; i < 32; ++i) {
-            int16x8_t a = vld1q_s16(acc + i * 8);
-            int16x8_t w = vld1q_s16(weights + i * 8);
-            vst1q_s16(acc + i * 8, vaddq_s16(a, w));
-        }
-#endif
-    } else {
-        for (size_t i = 0; i < TransformerHalfDim; ++i) {
-            acc[i] = static_cast<int16_t>(acc[i] + weights[i]);
-        }
+
+// ============================================================================
+// SIMD Hardware Optimization Layer
+// ============================================================================
+namespace Detail {
+
+// ----------------------------------------------------------------------------
+// AVX-512 Implementations
+// ----------------------------------------------------------------------------
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+inline void vec_add_avx512(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 8; ++i) {
+        __m512i a = _mm512_loadu_si512(acc + i * 32);
+        __m512i b = _mm512_loadu_si512(w + i * 32);
+        _mm512_storeu_si512(acc + i * 32, _mm512_add_epi16(a, b));
     }
 }
 
-// Helper function to vector-subtract feature weights from accumulator
-static inline void vec_sub(int16_t* acc, const int16_t* weights) {
-    if constexpr (HasAVX512) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        for (int i = 0; i < 8; ++i) {
-            __m512i a = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(acc + i * 32));
-            __m512i w = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(weights + i * 32));
-            _mm512_storeu_si512(reinterpret_cast<__m512i*>(acc + i * 32), _mm512_sub_epi16(a, w));
-        }
-#endif
-    } else if constexpr (HasAVX2) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        for (int i = 0; i < 16; ++i) {
-            __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
-            __m256i w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights + i * 16));
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_sub_epi16(a, w));
-        }
-#endif
-    } else if constexpr (HasNeon) {
-#if defined(__ARM_NEON) || defined(__ARM_NEON__)
-        for (int i = 0; i < 32; ++i) {
-            int16x8_t a = vld1q_s16(acc + i * 8);
-            int16x8_t w = vld1q_s16(weights + i * 8);
-            vst1q_s16(acc + i * 8, vsubq_s16(a, w));
-        }
-#endif
-    } else {
-        for (size_t i = 0; i < TransformerHalfDim; ++i) {
-            acc[i] = static_cast<int16_t>(acc[i] - weights[i]);
-        }
+inline void vec_sub_avx512(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 8; ++i) {
+        __m512i a = _mm512_loadu_si512(acc + i * 32);
+        __m512i b = _mm512_loadu_si512(w + i * 32);
+        _mm512_storeu_si512(acc + i * 32, _mm512_sub_epi16(a, b));
     }
 }
+
+inline void pack_avx512(uint8_t* out, const int16_t* us, const int16_t* them) {
+    const __m512i zero = _mm512_setzero_si512();
+    const __m512i max_val = _mm512_set1_epi16(127);
+    for (int i = 0; i < 8; ++i) {
+        __m512i u = _mm512_loadu_si512(us + i * 32);
+        u = _mm512_min_epi16(_mm512_max_epi16(u, zero), max_val);
+        __m512i t = _mm512_loadu_si512(them + i * 32);
+        t = _mm512_min_epi16(_mm512_max_epi16(t, zero), max_val);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(out + i * 32), _mm512_cvtepi16_epi8(u));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(out + 256 + i * 32), _mm512_cvtepi16_epi8(t));
+    }
+}
+
+#if defined(USE_VNNI) || defined(__AVX512VNNI__)
+inline int32_t dot_avx512_vnni(const uint8_t* act, const int8_t* w) {
+    __m512i sum = _mm512_setzero_si512();
+    for (int i = 0; i < 8; ++i) {
+        __m512i a = _mm512_loadu_si512(act + i * 64);
+        __m512i b = _mm512_loadu_si512(w + i * 64);
+        sum = _mm512_dpbusd_epi32(sum, a, b);
+    }
+    return _mm512_reduce_add_epi32(sum);
+}
+#endif
+#endif
+
+// ----------------------------------------------------------------------------
+// AVX2 Implementations
+// ----------------------------------------------------------------------------
+#if defined(__AVX2__)
+inline void vec_add_avx2(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 16; ++i) {
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
+        __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + i * 16));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_add_epi16(a, b));
+    }
+}
+
+inline void vec_sub_avx2(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 16; ++i) {
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(acc + i * 16));
+        __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + i * 16));
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(acc + i * 16), _mm256_sub_epi16(a, b));
+    }
+}
+
+inline void pack_avx2(uint8_t* out, const int16_t* us, const int16_t* them) {
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i max_val = _mm256_set1_epi16(127);
+    for (int i = 0; i < 16; ++i) {
+        __m256i u = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(us + i * 16));
+        u = _mm256_min_epi16(_mm256_max_epi16(u, zero), max_val);
+        __m256i t = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(them + i * 16));
+        t = _mm256_min_epi16(_mm256_max_epi16(t, zero), max_val);
+        
+        __m256i p = _mm256_packus_epi16(u, t);
+        p = _mm256_permute4x64_epi64(p, _MM_SHUFFLE(3, 1, 2, 0)); // Reorder lane-crossing
+        
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(out + i * 16), _mm256_castsi256_si128(p));
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(out + 256 + i * 16), _mm256_extracti128_si256(p, 1));
+    }
+}
+
+inline int32_t dot_avx2(const uint8_t* act, const int8_t* w) {
+    __m256i sum = _mm256_setzero_si256();
+    const __m256i ones = _mm256_set1_epi16(1);
+    for (int i = 0; i < 16; ++i) {
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(act + i * 32));
+        __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + i * 32));
+        __m256i mult = _mm256_maddubs_epi16(a, b);
+        __m256i dot = _mm256_madd_epi16(mult, ones);
+        sum = _mm256_add_epi32(sum, dot);
+    }
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i lo = _mm256_castsi256_si128(sum);
+    hi = _mm_add_epi32(hi, lo);
+    hi = _mm_hadd_epi32(hi, hi);
+    hi = _mm_hadd_epi32(hi, hi);
+    return _mm_cvtsi128_si32(hi);
+}
+
+#if defined(USE_VNNI) || defined(__AVX_VNNI__)
+inline int32_t dot_avx2_vnni(const uint8_t* act, const int8_t* w) {
+    __m256i sum = _mm256_setzero_si256();
+    for (int i = 0; i < 16; ++i) {
+        __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(act + i * 32));
+        __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + i * 32));
+        sum = _mm256_dpbusd_epi32(sum, a, b);
+    }
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i lo = _mm256_castsi256_si128(sum);
+    hi = _mm_add_epi32(hi, lo);
+    hi = _mm_hadd_epi32(hi, hi);
+    hi = _mm_hadd_epi32(hi, hi);
+    return _mm_cvtsi128_si32(hi);
+}
+#endif
+#endif
+
+// ----------------------------------------------------------------------------
+// ARM NEON Implementations
+// ----------------------------------------------------------------------------
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+inline void vec_add_neon(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 32; ++i) {
+        int16x8_t a = vld1q_s16(acc + i * 8);
+        int16x8_t b = vld1q_s16(w + i * 8);
+        vst1q_s16(acc + i * 8, vaddq_s16(a, b));
+    }
+}
+
+inline void vec_sub_neon(int16_t* acc, const int16_t* w) {
+    for (int i = 0; i < 32; ++i) {
+        int16x8_t a = vld1q_s16(acc + i * 8);
+        int16x8_t b = vld1q_s16(w + i * 8);
+        vst1q_s16(acc + i * 8, vsubq_s16(a, b));
+    }
+}
+
+inline void pack_neon(uint8_t* out, const int16_t* us, const int16_t* them) {
+    const int16x8_t zero = vdupq_n_s16(0);
+    const int16x8_t max_val = vdupq_n_s16(127);
+    for (int i = 0; i < 32; ++i) {
+        int16x8_t u = vld1q_s16(us + i * 8);
+        u = vminq_s16(vmaxq_s16(u, zero), max_val);
+        int16x8_t t = vld1q_s16(them + i * 8);
+        t = vminq_s16(vmaxq_s16(t, zero), max_val);
+
+        uint8x8_t u8 = vqmovun_s16(u);
+        uint8x8_t t8 = vqmovun_s16(t);
+
+        vst1_u8(out + i * 8, u8);
+        vst1_u8(out + 256 + i * 8, t8);
+    }
+}
+
+inline int32_t dot_neon(const uint8_t* act, const int8_t* w) {
+    int32x4_t sum = vdupq_n_s32(0);
+    for (int i = 0; i < 32; ++i) {
+        int8x16_t a = vld1q_s8(reinterpret_cast<const int8_t*>(act + i * 16));
+        int8x16_t b = vld1q_s8(w + i * 16);
+        
+        int16x8_t m_low = vmull_s8(vget_low_s8(a), vget_low_s8(b));
+        int16x8_t m_high = vmull_s8(vget_high_s8(a), vget_high_s8(b));
+        
+        sum = vpadalq_s16(sum, m_low);
+        sum = vpadalq_s16(sum, m_high);
+    }
+    return vaddvq_s32(sum);
+}
+
+#if defined(USE_DOTPROD) || defined(__ARM_FEATURE_DOTPROD)
+inline int32_t dot_neon_dotprod(const uint8_t* act, const int8_t* w) {
+    int32x4_t sum = vdupq_n_s32(0);
+    for (int i = 0; i < 32; ++i) {
+        int8x16_t a = vld1q_s8(reinterpret_cast<const int8_t*>(act + i * 16));
+        int8x16_t b = vld1q_s8(w + i * 16);
+        sum = vdotq_s32(sum, a, b);
+    }
+    return vaddvq_s32(sum);
+}
+#endif
+#endif
+
+// ----------------------------------------------------------------------------
+// Universal Scalar Fallbacks
+// ----------------------------------------------------------------------------
+inline void vec_add_scalar(int16_t* acc, const int16_t* w) {
+    for (size_t i = 0; i < TransformerHalfDim; ++i) {
+        acc[i] = static_cast<int16_t>(acc[i] + w[i]);
+    }
+}
+
+inline void vec_sub_scalar(int16_t* acc, const int16_t* w) {
+    for (size_t i = 0; i < TransformerHalfDim; ++i) {
+        acc[i] = static_cast<int16_t>(acc[i] - w[i]);
+    }
+}
+
+inline void pack_scalar(uint8_t* out, const int16_t* us, const int16_t* them) {
+    for (size_t i = 0; i < TransformerHalfDim; ++i) {
+        out[i] = static_cast<uint8_t>(std::clamp<int16_t>(us[i], 0, 127));
+        out[256 + i] = static_cast<uint8_t>(std::clamp<int16_t>(them[i], 0, 127));
+    }
+}
+
+inline int32_t dot_scalar(const uint8_t* act, const int8_t* w) {
+    int32_t sum = 0;
+    for (size_t i = 0; i < 2 * TransformerHalfDim; ++i) {
+        sum += act[i] * static_cast<int32_t>(w[i]);
+    }
+    return sum;
+}
+
+} // namespace Detail
+
+// ============================================================================
+// Core Execution Dispatchers
+// ============================================================================
+
+static inline void vec_add(int16_t* acc, const int16_t* weights) {
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    Detail::vec_add_avx512(acc, weights);
+#elif defined(__AVX2__)
+    Detail::vec_add_avx2(acc, weights);
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    Detail::vec_add_neon(acc, weights);
+#else
+    Detail::vec_add_scalar(acc, weights);
+#endif
+}
+
+static inline void vec_sub(int16_t* acc, const int16_t* weights) {
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    Detail::vec_sub_avx512(acc, weights);
+#elif defined(__AVX2__)
+    Detail::vec_sub_avx2(acc, weights);
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    Detail::vec_sub_neon(acc, weights);
+#else
+    Detail::vec_sub_scalar(acc, weights);
+#endif
+}
+
+static inline void pack_activations(uint8_t* out, const int16_t* us, const int16_t* them) {
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    Detail::pack_avx512(out, us, them);
+#elif defined(__AVX2__)
+    Detail::pack_avx2(out, us, them);
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    Detail::pack_neon(out, us, them);
+#else
+    Detail::pack_scalar(out, us, them);
+#endif
+}
+
+static inline int32_t compute_l1_dot_product(const uint8_t* act, const int8_t* w) {
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    #if defined(USE_VNNI) || defined(__AVX512VNNI__)
+        return Detail::dot_avx512_vnni(act, w);
+    #else
+        return Detail::dot_avx2(act, w); // Fallback to AVX2 logic if AVX-512 VNNI is absent
+    #endif
+#elif defined(__AVX2__)
+    #if defined(USE_VNNI) || defined(__AVX_VNNI__)
+        return Detail::dot_avx2_vnni(act, w);
+    #else
+        return Detail::dot_avx2(act, w);
+    #endif
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    #if defined(USE_DOTPROD) || defined(__ARM_FEATURE_DOTPROD)
+        return Detail::dot_neon_dotprod(act, w);
+    #else
+        return Detail::dot_neon(act, w);
+    #endif
+#else
+    return Detail::dot_scalar(act, w);
+#endif
+}
+
+
+// ============================================================================
+// Public NNUE Interface
+// ============================================================================
 
 void init() {
     net_loaded = false;
@@ -124,7 +358,6 @@ bool load_net(const std::string& path) {
 
     uint32_t magic = read_u32(file);
     if (magic != NnueVersionMagic && magic != 0x7AF32F20) {
-        // Unrecognized NNUE magic header
         net_loaded = false;
         return false;
     }
@@ -159,7 +392,6 @@ void refresh_accumulator(const Position& pos, Accumulator& acc) {
     Square w_ksq = pos.king_square(WHITE);
     Square b_ksq = pos.king_square(BLACK);
 
-    // Initialize accumulators with feature biases
     acc.white = net_weights.feature_biases;
     acc.black = net_weights.feature_biases;
 
@@ -169,12 +401,10 @@ void refresh_accumulator(const Position& pos, Accumulator& acc) {
         Piece pc = pos.piece_on(sq);
         if (type_of(pc) == KING) continue;
 
-        // White perspective feature
         size_t w_idx = feature_index(WHITE, w_ksq, pc, sq);
         const int16_t* w_w = &net_weights.feature_weights[w_idx * TransformerHalfDim];
         vec_add(acc.white.data(), w_w);
 
-        // Black perspective feature
         size_t b_idx = feature_index(BLACK, b_ksq, pc, sq);
         const int16_t* b_w = &net_weights.feature_weights[b_idx * TransformerHalfDim];
         vec_add(acc.black.data(), b_w);
@@ -246,80 +476,15 @@ Value evaluate(const Position& pos) {
     const int16_t* them_acc = (us == WHITE) ? acc.black.data() : acc.white.data();
 
     alignas(64) std::array<uint8_t, TransformerHalfDim * 2> packed_activations;
-
-    if constexpr (HasAVX2 || HasAVX512) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-        // 1. Vectorized ClippedReLU & Packing (int16_t -> uint8_t)
-        const __m256i zero = _mm256_setzero_si256();
-        const __m256i max_val = _mm256_set1_epi16(127);
-        
-        for (size_t i = 0; i < TransformerHalfDim / 16; ++i) {
-            // Load Us and Them accumulators
-            __m256i u = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(us_acc + i * 16));
-            __m256i t = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(them_acc + i * 16));
-            
-            // Clamp to [0, 127]
-            u = _mm256_min_epi16(_mm256_max_epi16(u, zero), max_val);
-            t = _mm256_min_epi16(_mm256_max_epi16(t, zero), max_val);
-            
-            // Pack 16-bit ints into 8-bit ints
-            __m256i packed = _mm256_packs_epi16(u, t); 
-            
-            // Permute to fix AVX lane crossing
-            packed = _mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0));
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(packed_activations.data() + i * 32), packed);
-        }
-#endif
-    } else {
-        // Generic Fallback
-        for (size_t i = 0; i < TransformerHalfDim; ++i) {
-            packed_activations[i] = static_cast<uint8_t>(std::clamp<int16_t>(us_acc[i], 0, 127));
-            packed_activations[TransformerHalfDim + i] = static_cast<uint8_t>(std::clamp<int16_t>(them_acc[i], 0, 127));
-        }
-    }
+    pack_activations(packed_activations.data(), us_acc, them_acc);
 
     std::array<int32_t, L1Dim> l1_out = net_weights.l1_biases;
 
-    // 2. Vectorized Dot Product for L1 Layer
     for (size_t i = 0; i < L1Dim; ++i) {
         const int8_t* w = &net_weights.l1_weights[i * 2 * TransformerHalfDim];
-        int32_t sum = 0;
-
-        if constexpr (HasAVX2 || HasAVX512) {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-            __m256i v_sum = _mm256_setzero_si256();
-            const __m256i ones = _mm256_set1_epi16(1);
-
-            for (size_t j = 0; j < (2 * TransformerHalfDim) / 32; ++j) {
-                __m256i act = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(packed_activations.data() + j * 32));
-                __m256i weight = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w + j * 32));
-
-                // Multiply uint8_t activations by int8_t weights -> int16_t pairs
-                __m256i mult = _mm256_maddubs_epi16(act, weight);
-                
-                // Multiply int16_t by 1 and horizontally add to int32_t
-                __m256i dot = _mm256_madd_epi16(mult, ones);
-                
-                v_sum = _mm256_add_epi32(v_sum, dot);
-            }
-
-            // Horizontal sum of the 8 int32_t values in v_sum
-            __m128i hi = _mm256_extracti128_si256(v_sum, 1);
-            __m128i lo = _mm256_castsi256_si128(v_sum);
-            hi = _mm_add_epi32(hi, lo);
-            hi = _mm_add_epi32(hi, _mm_shuffle_epi32(hi, _MM_SHUFFLE(1, 0, 3, 2)));
-            hi = _mm_add_epi32(hi, _mm_shuffle_epi32(hi, _MM_SHUFFLE(2, 3, 0, 1)));
-            sum += _mm_cvtsi128_si32(hi);
-#endif
-        } else {
-            for (size_t j = 0; j < 2 * TransformerHalfDim; ++j) {
-                sum += packed_activations[j] * static_cast<int32_t>(w[j]);
-            }
-        }
-        l1_out[i] += sum;
+        l1_out[i] += compute_l1_dot_product(packed_activations.data(), w);
     }
 
-    // Output Layer Forward Pass (Clipped ReLU + Linear transform to 1 score value)
     int32_t out = net_weights.output_bias[0];
     for (size_t i = 0; i < L1Dim; ++i) {
         int32_t val = l1_out[i] / 64;
@@ -327,7 +492,7 @@ Value evaluate(const Position& pos) {
         out += activated * static_cast<int32_t>(net_weights.output_weights[i]);
     }
 
-    int score = out / 16; // Scale down to centipawns
+    int score = out / 16; 
     return static_cast<Value>(score);
 }
 

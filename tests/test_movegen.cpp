@@ -29,8 +29,8 @@ protected:
             // Only count legal moves
             if (pos.make_move(m, next_si)) {
                 nodes += perft(depth - 1, pos);
+                pos.unmake_move(m);
             }
-            pos.unmake_move(m);
         }
         return nodes;
     }
