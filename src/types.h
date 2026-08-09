@@ -42,18 +42,32 @@ constexpr std::string_view BINARY_NAME    = "bully";
     constexpr bool IsWindows = true;
     constexpr bool IsLinux   = false;
     constexpr bool IsAndroid = false;
+    constexpr bool IsMacOS   = false;
+    constexpr std::string_view TargetOS = "Windows 64-bit";
 #elif defined(__ANDROID__)
     constexpr bool IsWindows = false;
     constexpr bool IsLinux   = true;
     constexpr bool IsAndroid = true;
+    constexpr bool IsMacOS   = false;
+    constexpr std::string_view TargetOS = "Android ARM64";
 #elif defined(__linux__)
     constexpr bool IsWindows = false;
     constexpr bool IsLinux   = true;
     constexpr bool IsAndroid = false;
+    constexpr bool IsMacOS   = false;
+    constexpr std::string_view TargetOS = "Linux 64-bit";
+#elif defined(__APPLE__)
+    constexpr bool IsWindows = false;
+    constexpr bool IsLinux   = false;
+    constexpr bool IsAndroid = false;
+    constexpr bool IsMacOS   = true;
+    constexpr std::string_view TargetOS = "macOS";
 #else
     constexpr bool IsWindows = false;
     constexpr bool IsLinux   = false;
     constexpr bool IsAndroid = false;
+    constexpr bool IsMacOS   = false;
+    constexpr std::string_view TargetOS = "POSIX / Generic OS";
 #endif
 
 // Compiler Detection

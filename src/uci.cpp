@@ -1001,27 +1001,15 @@ bool UCI::execute_line(const std::string& line) {
             run_benchmark(depth);
         }
         else if (token == "info") {
-            #if defined(_WIN32) || defined(_WIN64)
-                const char* target_os = "Windows 64-bit";
-            #elif defined(__ANDROID__)
-                const char* target_os = "Android ARM64";
-            #elif defined(__linux__)
-                const char* target_os = "Linux 64-bit";
-            #elif defined(__APPLE__)
-                const char* target_os = "macOS";
-            #else
-                const char* target_os = "POSIX / Generic OS";
-            #endif
-
-            #ifndef COMPILER_NAME
-                #define COMPILER_NAME "GCC / Clang (C++23)"
-            #endif
-            #ifndef BUILD_ARCH_NAME
-                #define BUILD_ARCH_NAME "native"
-            #endif
-            #ifndef BUILD_FLAGS_STR
-                #define BUILD_FLAGS_STR "-O3 -flto"
-            #endif
+#ifndef COMPILER_NAME
+            constexpr std::string_view COMPILER_NAME = CompilerName;
+#endif
+#ifndef BUILD_ARCH_NAME
+            constexpr std::string_view BUILD_ARCH_NAME = "native";
+#endif
+#ifndef BUILD_FLAGS_STR
+            constexpr std::string_view BUILD_FLAGS_STR = "-O3 -flto";
+#endif
 
             std::string simds;
             if constexpr (HasPext)    simds += (simds.empty() ? "" : ", ") + std::string("PEXT (BMI2)");
@@ -1041,7 +1029,7 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BUILD_ARCH_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.green, COMPILER_NAME, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Date & Time", style.magenta, __DATE__ " " __TIME__, style.reset);
-                std::cout << std::format(" {:<28} : {}{}{}\n", "Operating System", style.green, target_os, style.reset);
+                std::cout << std::format(" {:<28} : {}{}{}\n", "Operating System", style.green, TargetOS, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "C++ Standard & IPO", style.green, "C++23 (LTO Release)", style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Flags", style.cyan, BUILD_FLAGS_STR, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Hardware SIMD Features", style.magenta, simds, style.reset);
@@ -1052,7 +1040,7 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << style.blue << "========================================================================\n" << style.reset;
             } else {
                 std::cout << std::format("info name {} arch {} compiler {} date {} {} os {} threads {} hash {} MB eval {}\n",
-                                         ENGINE_NAME, BUILD_ARCH_NAME, COMPILER_NAME, __DATE__, __TIME__, target_os, Search::num_threads, TT.get_size_mb(), NNUE::use_nnue ? "nnue" : "classic");
+                                         ENGINE_NAME, BUILD_ARCH_NAME, COMPILER_NAME, __DATE__, __TIME__, TargetOS, Search::num_threads, TT.get_size_mb(), NNUE::use_nnue ? "nnue" : "classic");
             }
         }
         else if (token == "quit" || token == "exit") {
