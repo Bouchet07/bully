@@ -156,8 +156,8 @@ bool UCI::execute_line(const std::string& line) {
     }
 
         if (token == "uci") {
-            std::cout << std::format("id name {} {}\n", ENGINE_NAME, ENGINE_VERSION);
-            std::cout << std::format("id author {}\n", ENGINE_AUTHOR);
+            std::cout << std::format("id name {} {}\n", EngineName, EngineVersion);
+            std::cout << std::format("id author {}\n", EngineAuthor);
             std::cout << std::format("{}\n", UCI_OPTIONS);
             std::cout << "uciok\n" << std::flush;
         }
@@ -1015,7 +1015,7 @@ bool UCI::execute_line(const std::string& line) {
             if (is_interactive()) {
                 std::cout << std::format("{}Bully Chess Engine - Detailed Technical System Info{}\n", style.cyan, style.reset);
                 std::cout << style.blue << "========================================================================\n" << style.reset;
-                std::cout << std::format(" {:<28} : {}{} {}\n", "Engine Version", style.green, ENGINE_NAME, ENGINE_VERSION, style.reset);
+                std::cout << std::format(" {:<28} : {}{} {}\n", "Engine Version", style.green, EngineName, EngineVersion, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BuildArchName, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.green, CompilerName, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Date & Time", style.magenta, __DATE__ " " __TIME__, style.reset);
@@ -1030,7 +1030,7 @@ bool UCI::execute_line(const std::string& line) {
                 std::cout << style.blue << "========================================================================\n" << style.reset;
             } else {
                 std::cout << std::format("info name {} arch {} compiler {} date {} {} os {} threads {} hash {} MB eval {}\n",
-                                         ENGINE_NAME, BuildArchName, CompilerName, __DATE__, __TIME__, TargetOS, Search::num_threads, TT.get_size_mb(), NNUE::use_nnue ? "nnue" : "classic");
+                                         EngineName, BuildArchName, CompilerName, __DATE__, __TIME__, TargetOS, Search::num_threads, TT.get_size_mb(), NNUE::use_nnue ? "nnue" : "classic");
             }
         }
         else if (token == "quit" || token == "exit") {

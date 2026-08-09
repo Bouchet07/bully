@@ -22,18 +22,6 @@
 namespace Bully {
 
 // ============================================================================
-// Engine Metadata & Constants
-// ============================================================================
-constexpr std::string_view ENGINE_NAME    = "Bully";
-constexpr std::string_view ENGINE_VERSION = "1.2";
-constexpr std::string_view ENGINE_AUTHOR  = "Diego Bouchet";
-#if defined(_WIN32)
-constexpr std::string_view BINARY_NAME    = "bully.exe";
-#else
-constexpr std::string_view BINARY_NAME    = "bully";
-#endif
-
-// ============================================================================
 // System, Compiler & Hardware Feature Detection (constexpr Feature Table)
 // ============================================================================
 
@@ -69,6 +57,12 @@ constexpr std::string_view BINARY_NAME    = "bully";
     constexpr bool IsMacOS   = false;
     constexpr std::string_view TargetOS = "POSIX / Generic OS";
 #endif
+
+// Engine Metadata
+constexpr std::string_view EngineName    = "Bully";
+constexpr std::string_view EngineVersion = "1.2";
+constexpr std::string_view EngineAuthor  = "Diego Bouchet";
+constexpr std::string_view BinaryName    = IsWindows ? "bully.exe" : "bully";
 
 // Compiler Detection (CMake Override or Preprocessor Fallback)
 #if defined(BUILD_COMPILER_NAME)

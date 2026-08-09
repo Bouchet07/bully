@@ -88,8 +88,8 @@ void print_banner(bool use_utf8) {
         std::cout << " |____/ \\___/|_____|_____| |_|   \n\n" << style.reset;
     }
     std::cout << style.blue << "========================================================\n" << style.reset;
-    std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_VERSION, style.reset);
-    std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, ENGINE_AUTHOR, style.reset);
+    std::cout << std::format("  {}Version{}      : {}{}{}\n", style.green, style.reset, style.magenta, EngineVersion, style.reset);
+    std::cout << std::format("  {}Author{}       : {}{}{}\n", style.green, style.reset, style.magenta, EngineAuthor, style.reset);
 
     std::cout << std::format("  {}Compiler{}     : {}{}{}\n", style.green, style.reset, style.magenta, CompilerName, style.reset);
     std::cout << std::format("  {}Build{}        : {}{}{}\n", style.green, style.reset, style.magenta, BuildArchName, style.reset);
@@ -228,7 +228,7 @@ void print_plain_options() {
 
 
 void print_arguments_guide(bool use_color) {
-    std::string bin(BINARY_NAME);
+    std::string bin(BinaryName);
     int p1 = std::max(1, 38 - static_cast<int>(bin.length()));
     int p2 = std::max(1, 28 - static_cast<int>(bin.length()));
     int p3 = std::max(1, 22 - static_cast<int>(bin.length()));
