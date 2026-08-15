@@ -58,10 +58,17 @@ configure_file(
 
 # Define static library for the engine to share with the executable and tests
 add_library(engine_lib STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
-set_source_files_properties(Pyrrhic/tbprobe.c PROPERTIES 
-    LANGUAGE CXX
-    COMPILE_FLAGS "-w"
-)
+if(MSVC)
+    set_source_files_properties(Pyrrhic/tbprobe.c PROPERTIES 
+        LANGUAGE CXX
+        COMPILE_FLAGS "/W0 /wd9025"
+    )
+else()
+    set_source_files_properties(Pyrrhic/tbprobe.c PROPERTIES 
+        LANGUAGE CXX
+        COMPILE_FLAGS "-w"
+    )
+endif()
 target_include_directories(engine_lib PUBLIC src Pyrrhic)
 
 # ============================================================================

@@ -60,7 +60,7 @@ namespace Bully {
 
 // Engine Metadata
 constexpr std::string_view EngineName    = "Bully";
-constexpr std::string_view EngineVersion = "1.2.1";
+constexpr std::string_view EngineVersion = "1.3";
 constexpr std::string_view EngineAuthor  = "Diego Bouchet";
 constexpr std::string_view BinaryName    = IsWindows ? "bully.exe" : "bully";
 
@@ -190,7 +190,7 @@ enum Bound : uint8_t {
 // ============================================================================
 // Evaluation Scores & Piece Values
 // ============================================================================
-using Value = int16_t;
+using Value = int;
 
 constexpr Value VALUE_ZERO             = 0;
 constexpr Value VALUE_DRAW             = 0;
