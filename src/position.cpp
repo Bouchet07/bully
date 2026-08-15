@@ -100,8 +100,8 @@ void Position::add_piece(Piece pc, Square sq) {
     board[idx] = pc;
     PieceType pt = type_of(pc);
     Color c = color_of(pc);
-    pieces_by_type[to_index(pt)] |= sq;
-    pieces_by_color[to_index(c)] |= sq;
+    pieces_by_type[to_index(pt)] |= square_bb(sq);
+    pieces_by_color[to_index(c)] |= square_bb(sq);
 }
 
 void Position::remove_piece(Square sq) {
@@ -109,8 +109,8 @@ void Position::remove_piece(Square sq) {
     Piece pc = board[idx];
     PieceType pt = type_of(pc);
     Color c = color_of(pc);
-    pieces_by_type[to_index(pt)] ^= sq;
-    pieces_by_color[to_index(c)] ^= sq;
+    pieces_by_type[to_index(pt)] ^= square_bb(sq);
+    pieces_by_color[to_index(c)] ^= square_bb(sq);
     board[idx] = NO_PIECE;
 }
 
@@ -212,14 +212,61 @@ void Position::set_fen(const std::string& fen, StateInfo& si) {
 
     // 3. Castling rights
     si.castling_rights = NO_CASTLING;
+    std::fill(castling_rook_sq.begin(), castling_rook_sq.end(), SQ_NONE);
+    std::fill(castling_rights_mask.begin(), castling_rights_mask.end(), ANY_CASTLING);
+
     if (tokens.size() > 2) {
         std::string castling = tokens[2];
         if (castling != "-") {
+            Square w_ksq = king_square(WHITE);
+            Square b_ksq = king_square(BLACK);
+
             for (char c : castling) {
-                if (c == 'K') si.castling_rights = static_cast<CastlingRights>(si.castling_rights | WHITE_OO);
-                else if (c == 'Q') si.castling_rights = static_cast<CastlingRights>(si.castling_rights | WHITE_OOO);
-                else if (c == 'k') si.castling_rights = static_cast<CastlingRights>(si.castling_rights | BLACK_OO);
-                else if (c == 'q') si.castling_rights = static_cast<CastlingRights>(si.castling_rights | BLACK_OOO);
+                if (c == 'K') {
+                    Bitboard rooks = pieces(WHITE, ROOK) & rank_bb(RANK_1);
+                    Square r_sq = is_chess960 ? (rooks ? msb(rooks) : SQ_H1) : SQ_H1;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | WHITE_OO);
+                    castling_rook_sq[to_index(WHITE_OO)] = r_sq;
+                    if (w_ksq != SQ_NONE) castling_rights_mask[to_index(w_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(w_ksq)] & ~WHITE_OO);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~WHITE_OO);
+                } else if (c == 'Q') {
+                    Bitboard rooks = pieces(WHITE, ROOK) & rank_bb(RANK_1);
+                    Square r_sq = is_chess960 ? (rooks ? lsb(rooks) : SQ_A1) : SQ_A1;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | WHITE_OOO);
+                    castling_rook_sq[to_index(WHITE_OOO)] = r_sq;
+                    if (w_ksq != SQ_NONE) castling_rights_mask[to_index(w_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(w_ksq)] & ~WHITE_OOO);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~WHITE_OOO);
+                } else if (c >= 'A' && c <= 'H') {
+                    File f = static_cast<File>(c - 'A');
+                    Square r_sq = make_square(f, RANK_1);
+                    CastlingRights cr = (w_ksq != SQ_NONE && r_sq > w_ksq) ? WHITE_OO : WHITE_OOO;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | cr);
+                    castling_rook_sq[to_index(cr)] = r_sq;
+                    if (w_ksq != SQ_NONE) castling_rights_mask[to_index(w_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(w_ksq)] & ~cr);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~cr);
+                } else if (c == 'k') {
+                    Bitboard rooks = pieces(BLACK, ROOK) & rank_bb(RANK_8);
+                    Square r_sq = is_chess960 ? (rooks ? msb(rooks) : SQ_H8) : SQ_H8;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | BLACK_OO);
+                    castling_rook_sq[to_index(BLACK_OO)] = r_sq;
+                    if (b_ksq != SQ_NONE) castling_rights_mask[to_index(b_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(b_ksq)] & ~BLACK_OO);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~BLACK_OO);
+                } else if (c == 'q') {
+                    Bitboard rooks = pieces(BLACK, ROOK) & rank_bb(RANK_8);
+                    Square r_sq = is_chess960 ? (rooks ? lsb(rooks) : SQ_A8) : SQ_A8;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | BLACK_OOO);
+                    castling_rook_sq[to_index(BLACK_OOO)] = r_sq;
+                    if (b_ksq != SQ_NONE) castling_rights_mask[to_index(b_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(b_ksq)] & ~BLACK_OOO);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~BLACK_OOO);
+                } else if (c >= 'a' && c <= 'h') {
+                    File f = static_cast<File>(c - 'a');
+                    Square r_sq = make_square(f, RANK_8);
+                    CastlingRights cr = (b_ksq != SQ_NONE && r_sq > b_ksq) ? BLACK_OO : BLACK_OOO;
+                    si.castling_rights = static_cast<CastlingRights>(si.castling_rights | cr);
+                    castling_rook_sq[to_index(cr)] = r_sq;
+                    if (b_ksq != SQ_NONE) castling_rights_mask[to_index(b_ksq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(b_ksq)] & ~cr);
+                    castling_rights_mask[to_index(r_sq)] = static_cast<CastlingRights>(castling_rights_mask[to_index(r_sq)] & ~cr);
+                }
             }
         }
     }
@@ -228,7 +275,7 @@ void Position::set_fen(const std::string& fen, StateInfo& si) {
     si.en_passant_square = SQ_NONE;
     if (tokens.size() > 3) {
         std::string ep = tokens[3];
-        if (ep != "-") {
+        if (ep.length() == 2 && ep[0] >= 'a' && ep[0] <= 'h' && ep[1] >= '1' && ep[1] <= '8') {
             File f = static_cast<File>(ep[0] - 'a');
             Rank r = static_cast<Rank>(ep[1] - '1');
             si.en_passant_square = make_square(f, r);
@@ -307,10 +354,25 @@ std::string Position::get_fen() const {
         fen += rank_char;
     }
 
-    fen += " " + std::to_string(st->rule50);
-    fen += " 1";
-
+    fen += " " + std::to_string(st->rule50) + " 1";
     return fen;
+}
+
+bool Position::castling_impeded(CastlingRights cr) const {
+    Color us = (cr & WHITE_CASTLING) ? WHITE : BLACK;
+    Square king_from = king_square(us);
+    Square rook_from = castling_rook_sq[to_index(cr)];
+    if (king_from == SQ_NONE || rook_from == SQ_NONE) return true;
+
+    bool is_kingside = (cr & KING_SIDE);
+    Square king_to = is_kingside ? (us == WHITE ? SQ_G1 : SQ_G8) : (us == WHITE ? SQ_C1 : SQ_C8);
+    Square rook_to = is_kingside ? (us == WHITE ? SQ_F1 : SQ_F8) : (us == WHITE ? SQ_D1 : SQ_D8);
+
+    Bitboard king_path = BetweenBB[to_index(king_from)][to_index(king_to)] | square_bb(king_to);
+    Bitboard rook_path = BetweenBB[to_index(rook_from)][to_index(rook_to)] | square_bb(rook_to);
+
+    Bitboard obstacles = (king_path | rook_path) & ~square_bb(king_from) & ~square_bb(rook_from);
+    return (occupied() & obstacles) != 0;
 }
 
 bool Position::attacked(Square sq, Color attacked_by) const {
@@ -384,31 +446,26 @@ bool Position::pseudo_legal(Move m) const {
     // 1. Piece must exist and belong to the side to move
     if (pc == NO_PIECE || color_of(pc) != us) return false;
 
+    PieceType pt = type_of(pc);
+    MoveType type = m.type_of();
+
+    if (type == CASTLING) {
+        if (pt != KING) return false;
+        if (us == WHITE) {
+            if (to == castling_rook_sq[to_index(WHITE_OO)]) return (st->castling_rights & WHITE_OO) != 0;
+            if (to == castling_rook_sq[to_index(WHITE_OOO)]) return (st->castling_rights & WHITE_OOO) != 0;
+        } else {
+            if (to == castling_rook_sq[to_index(BLACK_OO)]) return (st->castling_rights & BLACK_OO) != 0;
+            if (to == castling_rook_sq[to_index(BLACK_OOO)]) return (st->castling_rights & BLACK_OOO) != 0;
+        }
+        return false;
+    }
+
     Piece target = board[to_index(to)];
 
     // 2. Cannot capture our own pieces or the enemy King
     if (target != NO_PIECE && (color_of(target) == us || type_of(target) == KING)) {
         return false;
-    }
-
-    PieceType pt = type_of(pc);
-    MoveType type = m.type_of();
-
-    if (type == EN_PASSANT) {
-        return pt == PAWN && to == st->en_passant_square;
-    }
-
-    if (type == PROMOTION) {
-        if (pt != PAWN || relative_rank(us, to) != RANK_8) return false;
-    }
-
-    if (type == CASTLING) {
-        if (pt != KING) return false;
-        if (us == WHITE) {
-            return (from == SQ_E1 && (to == SQ_G1 || to == SQ_C1));
-        } else {
-            return (from == SQ_E8 && (to == SQ_G8 || to == SQ_C8));
-        }
     }
 
     // 3. Verify piece can actually attack/reach target square
@@ -451,16 +508,25 @@ bool Position::legal(Move m) const {
 
     if (type == CASTLING) {
         if (in_check()) return false;
-        if (to == SQ_G1) return !attacked(SQ_F1, BLACK) && !attacked(SQ_G1, BLACK);
-        if (to == SQ_C1) return !attacked(SQ_C1, BLACK) && !attacked(SQ_D1, BLACK);
-        if (to == SQ_G8) return !attacked(SQ_F8, WHITE) && !attacked(SQ_G8, WHITE);
-        if (to == SQ_C8) return !attacked(SQ_C8, WHITE) && !attacked(SQ_D8, WHITE);
+        Square r_to = to; // Rook's starting square
+        CastlingRights cr = (us == WHITE) ? (r_to == castling_rook_sq[to_index(WHITE_OO)] ? WHITE_OO : WHITE_OOO)
+                                          : (r_to == castling_rook_sq[to_index(BLACK_OO)] ? BLACK_OO : BLACK_OOO);
+        bool is_kingside = (cr & KING_SIDE);
+        Square king_to = is_kingside ? (us == WHITE ? SQ_G1 : SQ_G8) : (us == WHITE ? SQ_C1 : SQ_C8);
+        
+        Direction step = (king_to > from) ? EAST : WEST;
+        Square sq = from;
+        while (true) {
+            if (attacked(sq, ~us)) return false;
+            if (sq == king_to) break;
+            sq = sq + step;
+        }
         return true;
     }
 
     Square ksq = king_square(us);
     if (type_of(board[to_index(from)]) == KING) {
-        return !attacked(to, ~us, occupied() ^ square_bb(from));
+        return !attacked(to, ~us, (occupied() ^ square_bb(from)) & ~square_bb(to));
     }
 
     Bitboard chk = checkers(us);
@@ -511,7 +577,7 @@ bool Position::make_move(Move m, StateInfo& new_state) {
         new_state.rule50 = 0;
     }
 
-    Piece captured = board[to_index(to)];
+    Piece captured = (type == CASTLING) ? NO_PIECE : board[to_index(to)];
     if (type == EN_PASSANT) {
         Square cap_sq = to - pawn_push(us);
         captured = board[to_index(cap_sq)];
@@ -540,37 +606,40 @@ bool Position::make_move(Move m, StateInfo& new_state) {
         }
     } else {
         new_state.key ^= PieceKeys[to_index(pc)][to_index(from)];
-        remove_piece(from);
 
         if (type == PROMOTION) {
+            remove_piece(from);
             PieceType promo_pt = m.promotion_type();
             Piece promo_pc = make_piece(us, promo_pt);
             add_piece(promo_pc, to);
             new_state.key ^= PieceKeys[to_index(promo_pc)][to_index(to)];
         } else if (type == EN_PASSANT) {
+            remove_piece(from);
             add_piece(pc, to);
             new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
         } else if (type == CASTLING) {
-            Square r_from = SQ_NONE;
-            Square r_to = SQ_NONE;
-            if (to == SQ_G1) { r_from = SQ_H1; r_to = SQ_F1; }
-            else if (to == SQ_C1) { r_from = SQ_A1; r_to = SQ_D1; }
-            else if (to == SQ_G8) { r_from = SQ_H8; r_to = SQ_F8; }
-            else if (to == SQ_C8) { r_from = SQ_A8; r_to = SQ_D8; }
+            bool is_kingside = (to == castling_rook_sq[to_index(us == WHITE ? WHITE_OO : BLACK_OO)]);
+            Square king_to = is_kingside ? (us == WHITE ? SQ_G1 : SQ_G8) : (us == WHITE ? SQ_C1 : SQ_C8);
+            Square rook_to = is_kingside ? (us == WHITE ? SQ_F1 : SQ_F8) : (us == WHITE ? SQ_D1 : SQ_D8);
 
-            Piece rook = board[to_index(r_from)];
-            new_state.key ^= PieceKeys[to_index(rook)][to_index(r_from)];
-            remove_piece(r_from);
-            add_piece(rook, r_to);
-            new_state.key ^= PieceKeys[to_index(rook)][to_index(r_to)];
+            Piece king = pc;
+            Piece rook = board[to_index(to)];
 
-            add_piece(pc, to);
-            new_state.key ^= PieceKeys[to_index(pc)][to_index(to)];
+            remove_piece(from);
+
+            remove_piece(to);
+            new_state.key ^= PieceKeys[to_index(rook)][to_index(to)];
+
+            add_piece(king, king_to);
+            new_state.key ^= PieceKeys[to_index(king)][to_index(king_to)];
+
+            add_piece(rook, rook_to);
+            new_state.key ^= PieceKeys[to_index(rook)][to_index(rook_to)];
         }
     }
 
     new_state.castling_rights = static_cast<CastlingRights>(
-        new_state.castling_rights & CastlingRightsMask[to_index(from)] & CastlingRightsMask[to_index(to)]
+        new_state.castling_rights & castling_rights_mask[to_index(from)] & castling_rights_mask[to_index(to)]
     );
     new_state.key ^= CastlingKeys[to_index(new_state.castling_rights)];
 
@@ -578,38 +647,41 @@ bool Position::make_move(Move m, StateInfo& new_state) {
     DirtyPiece& dp = new_state.dirty_piece;
     dp.count = 0;
 
-    if (pt != KING) {
-        if (type == PROMOTION) {
-            Piece promo_pc = make_piece(us, m.promotion_type());
-            dp.piece[0] = pc;
-            dp.from[0]  = from;
-            dp.to[0]    = SQ_NONE;
-            dp.piece[1] = promo_pc;
-            dp.from[1]  = SQ_NONE;
-            dp.to[1]    = to;
-            dp.count = 2;
-        } else {
-            dp.piece[0] = pc;
-            dp.from[0]  = from;
-            dp.to[0]    = to;
-            dp.count = 1;
+    if (type == CASTLING) {
+        // The King moves, so the side-to-move's accumulator is fully refreshed.
+        // We only log the Rook so the opponent's accumulator updates incrementally.
+        bool is_kingside = (to == castling_rook_sq[to_index(us == WHITE ? WHITE_OO : BLACK_OO)]);
+        Square rook_to = is_kingside ? (us == WHITE ? SQ_F1 : SQ_F8) : (us == WHITE ? SQ_D1 : SQ_D8);
+        
+        dp.piece[0] = make_piece(us, ROOK);
+        dp.from[0]  = to; // Rook's original square
+        dp.to[0]    = rook_to;
+        dp.count = 1;
+    } else {
+        if (pt != KING) {
+            if (type == PROMOTION) {
+                Piece promo_pc = make_piece(us, m.promotion_type());
+                dp.piece[0] = pc;
+                dp.from[0]  = from;
+                dp.to[0]    = SQ_NONE;
+                dp.piece[1] = promo_pc;
+                dp.from[1]  = SQ_NONE;
+                dp.to[1]    = to;
+                dp.count = 2;
+            } else {
+                dp.piece[0] = pc;
+                dp.from[0]  = from;
+                dp.to[0]    = to;
+                dp.count = 1;
+            }
         }
-
+        
+        // We MUST log the captured piece even if pt == KING, so the opponent's accumulator updates
         if (captured != NO_PIECE) {
             Square cap_sq = (type == EN_PASSANT) ? (to - pawn_push(us)) : to;
             dp.piece[dp.count] = captured;
             dp.from[dp.count]  = cap_sq;
             dp.to[dp.count]    = SQ_NONE;
-            dp.count++;
-        }
-
-        if (type == CASTLING) {
-            Square r_from = (to == SQ_G1) ? SQ_H1 : (to == SQ_C1) ? SQ_A1 : (to == SQ_G8) ? SQ_H8 : SQ_A8;
-            Square r_to   = (to == SQ_G1) ? SQ_F1 : (to == SQ_C1) ? SQ_D1 : (to == SQ_G8) ? SQ_F8 : SQ_D8;
-            Piece rook = make_piece(us, ROOK);
-            dp.piece[dp.count] = rook;
-            dp.from[dp.count]  = r_from;
-            dp.to[dp.count]    = r_to;
             dp.count++;
         }
     }
@@ -632,18 +704,18 @@ void Position::unmake_move(Move m) {
         remove_piece(to);
         add_piece(make_piece(us, PAWN), from);
     } else if (type == CASTLING) {
-        remove_piece(to);
-        add_piece(make_piece(us, KING), from);
+        bool is_kingside = (to == castling_rook_sq[to_index(us == WHITE ? WHITE_OO : BLACK_OO)]);
+        Square king_to = is_kingside ? (us == WHITE ? SQ_G1 : SQ_G8) : (us == WHITE ? SQ_C1 : SQ_C8);
+        Square rook_to = is_kingside ? (us == WHITE ? SQ_F1 : SQ_F8) : (us == WHITE ? SQ_D1 : SQ_D8);
 
-        Square r_from = SQ_NONE;
-        Square r_to = SQ_NONE;
-        if (to == SQ_G1) { r_from = SQ_H1; r_to = SQ_F1; }
-        else if (to == SQ_C1) { r_from = SQ_A1; r_to = SQ_D1; }
-        else if (to == SQ_G8) { r_from = SQ_H8; r_to = SQ_F8; }
-        else if (to == SQ_C8) { r_from = SQ_A8; r_to = SQ_D8; }
+        Piece king = make_piece(us, KING);
+        Piece rook = make_piece(us, ROOK);
 
-        remove_piece(r_to);
-        add_piece(make_piece(us, ROOK), r_from);
+        remove_piece(king_to);
+        remove_piece(rook_to);
+
+        add_piece(king, from);
+        add_piece(rook, to);
     } else {
         move_piece_internal(to, from);
     }
@@ -830,9 +902,7 @@ Value Position::see(Move m) const {
 
     // Minimax back propagation
     while (--depth > 0) {
-        gain[depth - 1] = static_cast<Value>(
-            gain[depth - 1] - std::max(static_cast<Value>(0), gain[depth])
-        );
+        gain[depth - 1] = gain[depth - 1] - std::max(0, gain[depth]);
     }
 
     return gain[0];

@@ -124,6 +124,12 @@ public:
     [[nodiscard]] int rule50() const { return st->rule50; }
     void set_state_pointer(StateInfo* new_st) { st = new_st; }
 
+    // Chess960 Helpers
+    [[nodiscard]] Square castling_rook_square(CastlingRights cr) const { return castling_rook_sq[to_index(cr)]; }
+    [[nodiscard]] bool castling_impeded(CastlingRights cr) const;
+
+    inline static bool& is_chess960 = Bully::is_chess960;
+
     // Print the board representation to stdout
     void print(bool Use_UTF8 = true, bool Use_Color = false) const;
 
@@ -143,6 +149,8 @@ private:
     std::array<Piece, SQUARE_NB>               board = {NO_PIECE}; // mailbox array
     std::array<Bitboard, PIECE_TYPE_NB>        pieces_by_type = {0};
     std::array<Bitboard, COLOR_NB>             pieces_by_color = {0};
+    std::array<Square, CASTLING_RIGHT_NB>      castling_rook_sq = {SQ_NONE};
+    std::array<CastlingRights, SQUARE_NB>      castling_rights_mask = {ANY_CASTLING};
     Color side_to_move_color = WHITE;
     StateInfo* st = nullptr;
 };

@@ -151,3 +151,37 @@ TEST_F(EvaluationTest, TaperedPhaseBlending) {
     EXPECT_TRUE(eg_output.find("Phase : 0") != std::string::npos);
 }
 
+// 8. Passed Pawn Rank-Scaled Bonuses
+TEST_F(EvaluationTest, PassedPawnBonuses) {
+    Position pos_e3;
+    StateInfo si_e3;
+    pos_e3.set_fen("k7/8/8/8/8/4P3/8/K7 w - - 0 1", si_e3);
+    Value val_e3 = Eval::evaluate(pos_e3);
+
+    Position pos_e6;
+    StateInfo si_e6;
+    pos_e6.set_fen("k7/8/4P3/8/8/8/8/K7 w - - 0 1", si_e6);
+    Value val_e6 = Eval::evaluate(pos_e6);
+
+    // Advanced passed pawn on e6 should score significantly higher than e3
+    EXPECT_GT(val_e6, val_e3);
+}
+
+// 9. Endgame King Activity (Center vs Corner)
+TEST_F(EvaluationTest, EndgameKingActivity) {
+    Position pos_center;
+    StateInfo si_center;
+    // Endgame position (phase 0) with White King centralized on E4
+    pos_center.set_fen("k7/8/8/8/4K3/8/8/8 w - - 0 1", si_center);
+    Value val_center = Eval::evaluate(pos_center);
+
+    Position pos_corner;
+    StateInfo si_corner;
+    // Endgame position (phase 0) with White King in corner A1
+    pos_corner.set_fen("k7/8/8/8/8/8/8/K7 w - - 0 1", si_corner);
+    Value val_corner = Eval::evaluate(pos_corner);
+
+    // Centralized King in the endgame should be evaluated higher than cornered King
+    EXPECT_GT(val_center, val_corner);
+}
+

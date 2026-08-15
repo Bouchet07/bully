@@ -51,6 +51,18 @@ TEST(AttacksTest, KnightAttacks) {
                         square_bb(SQ_D2) | square_bb(SQ_F2);
                         
     EXPECT_EQ(att, expected);
+
+    // Corner SQ_A1: 2 moves (B3, C2)
+    Bitboard att_a1 = knight_attacks(SQ_A1);
+    EXPECT_EQ(att_a1, square_bb(SQ_B3) | square_bb(SQ_C2));
+
+    // Corner SQ_H8: 2 moves (F7, G6)
+    Bitboard att_h8 = knight_attacks(SQ_H8);
+    EXPECT_EQ(att_h8, square_bb(SQ_F7) | square_bb(SQ_G6));
+
+    // Edge SQ_A4: 4 moves (B6, C5, C3, B2)
+    Bitboard att_a4 = knight_attacks(SQ_A4);
+    EXPECT_EQ(att_a4, square_bb(SQ_B6) | square_bb(SQ_C5) | square_bb(SQ_C3) | square_bb(SQ_B2));
 }
 
 // King attacks validation
@@ -122,9 +134,16 @@ TEST(AttacksTest, BishopAttacks) {
 TEST(BitboardTest, OperationsAndShifts) {
     init_bitboards();
     
-    // lsb helper
+    // lsb and msb helper
     Bitboard b = square_bb(SQ_C3) | square_bb(SQ_F5);
     EXPECT_EQ(lsb(b), SQ_C3);
+    EXPECT_EQ(msb(b), SQ_F5);
+
+    // pop_lsb helper
+    Bitboard temp_b = b;
+    Square popped = pop_lsb(temp_b);
+    EXPECT_EQ(popped, SQ_C3);
+    EXPECT_EQ(temp_b, square_bb(SQ_F5));
 
     // more_than_one helper
     EXPECT_TRUE(more_than_one(b));

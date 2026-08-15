@@ -140,6 +140,9 @@ void print_interactive_help() {
     std::cout << "  " << style.yellow << "info" << style.reset
               << "                       : Print detailed build, compiler, OS, flags, and SIMD info.\n";
     std::cout << "  " << style.yellow << "syzygy" << style.reset << " [" << style.magenta << "<path>" << style.reset << "|" << style.green << "on" << style.reset << "|" << style.green << "off" << style.reset << "]     : View or set Syzygy tablebases path & state.\n";
+    std::cout << "  " << style.yellow << "variation" << style.reset << " ["
+              << style.magenta << "<name>" << style.reset
+              << "]         : View or set active chess variation (standard / chess960).\n";
     std::cout << "  " << style.yellow << "uci" << style.reset << "                        : Switch to UCI engine mode.\n";
     std::cout << "  " << style.yellow << "quit" << style.reset << " / " << style.yellow << "exit" << style.reset
               << "                : Terminate Bully.\n";
@@ -168,6 +171,7 @@ void print_plain_help() {
     std::cout << "  autoprint [on|off]                  : Toggle board auto-printing after moves.\n";
     std::cout << "  options [name [on|off]]             : View or toggle search heuristic options.\n";
     std::cout << "  syzygy [<path>|on|off]              : View or set Syzygy tablebases path & state.\n";
+    std::cout << "  variation [<name>]                  : View or set active chess variation (standard / chess960).\n";
     std::cout << "  uci                                 : Switch to UCI engine mode.\n";
     std::cout << "  quit / exit                         : Terminate Bully.\n";
     std::cout << "===================================\n\n";

@@ -145,3 +145,26 @@ TEST_F(PositionTest, StaticExchangeEvaluation) {
     Move m3(SQ_D2, SQ_D5);
     EXPECT_EQ(pos3.see(m3), 160); // Gain 330 (bishop) - Lose 500 (rook) (returns 160 based on engine SEE math)
 }
+
+TEST_F(PositionTest, FENRoundTripIntegrity) {
+    const std::vector<std::string> test_fens = {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 1"
+    };
+
+    for (const auto& fen : test_fens) {
+        Position p1;
+        StateInfo s1;
+        p1.set_fen(fen, s1);
+
+        std::string generated_fen = p1.get_fen();
+        EXPECT_EQ(generated_fen, fen);
+
+        Position p2;
+        StateInfo s2;
+        p2.set_fen(generated_fen, s2);
+        EXPECT_EQ(p1.key(), p2.key());
+    }
+}

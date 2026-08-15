@@ -337,6 +337,21 @@ bool UCI::execute_line(const std::string& line) {
                         }
                     }
                 }
+                else if (option_name == "UCI_Chess960" || option_name == "Variation" || option_name == "Variant") {
+                    std::string value_keyword;
+                    is >> value_keyword; // "value"
+                    std::string val;
+                    if (is >> val) {
+                        if (val == "chess960" || val == "960" || val == "fischer" || val == "fischerrandom" || val == "true") {
+                            Position::is_chess960 = true;
+                        } else {
+                            Position::is_chess960 = false;
+                        }
+                        if (is_interactive()) {
+                            std::cout << std::format("Variation set to {}.\n", Position::is_chess960 ? "chess960" : "standard");
+                        }
+                    }
+                }
                 else if (option_name == "AspirationWindow") {
                     std::string value_keyword;
                     is >> value_keyword; // "value"
@@ -999,6 +1014,44 @@ bool UCI::execute_line(const std::string& line) {
             int depth = 10;
             is >> depth;
             run_benchmark(depth);
+        }
+        else if (token == "variation" || token == "variant") {
+            std::string sub;
+            if (is >> sub) {
+                if (sub == "standard" || sub == "std" || sub == "normal" || sub == "chess") {
+                    Position::is_chess960 = false;
+                    if (is_interactive()) {
+                        std::cout << std::format("Chess variation set to {}{}{}.\n",
+                                                 style.magenta, "standard", style.reset);
+                    } else {
+                        std::cout << "variation standard\n";
+                    }
+                } else if (sub == "chess960" || sub == "960" || sub == "fischer" || sub == "fischerrandom") {
+                    Position::is_chess960 = true;
+                    if (is_interactive()) {
+                        std::cout << std::format("Chess variation set to {}{}{}.\n",
+                                                 style.magenta, "chess960", style.reset);
+                    } else {
+                        std::cout << "variation chess960\n";
+                    }
+                } else {
+                    if (is_interactive()) {
+                        std::cout << std::format("{}Unknown variation: '{}{}{}'. Available variations: {}standard{}, {}chess960{}.{}\n",
+                                                 style.red, style.magenta, sub, style.reset,
+                                                 style.green, "standard", style.reset,
+                                                 style.green, "chess960", style.reset, style.reset);
+                    } else {
+                        std::cout << std::format("Unknown variation: '{}'. Available variations: standard, chess960.\n", sub);
+                    }
+                }
+            } else {
+                if (is_interactive()) {
+                    std::cout << std::format("Chess Variation : {}{}{}\n",
+                                             style.magenta, Position::is_chess960 ? "chess960" : "standard", style.reset);
+                } else {
+                    std::cout << std::format("variation {}\n", Position::is_chess960 ? "chess960" : "standard");
+                }
+            }
         }
         else if (token == "info") {
             std::string simds;

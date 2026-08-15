@@ -493,7 +493,7 @@ Value evaluate(const Position& pos) {
     }
 
     int score = out / 16; 
-    return static_cast<Value>(score);
+    return score;
 }
 
 } // namespace NNUE

@@ -140,7 +140,7 @@ constexpr bool HasNeon = true;
 constexpr bool HasNeon = false;
 #endif
 
-constexpr std::string_view UCI_OPTIONS    = "option name Hash type spin default 16 min 1 max 2048\noption name Clear Hash type button\noption name Threads type spin default 1 min -1 max 128\noption name SyzygyPath type string default syzygy\noption name UseNNUE type check default false\noption name EvalFile type string default nn-7821938.nnue\noption name MultiPV type spin default 1 min 1 max 128\noption name NullMovePruning type check default true\noption name LateMoveReduction type check default true\noption name ReverseFutilityPruning type check default true\noption name LateMovePruning type check default true\noption name FutilityPruning type check default true\noption name CheckExtensions type check default true\noption name SingularExtensions type check default true\noption name AspirationWindow type check default true\noption name QuiescenceSearch type check default true\noption name UseTT type check default true\noption name KillerHeuristic type check default true\noption name HistoryHeuristic type check default true\noption name Ponder type check default false";
+constexpr std::string_view UCI_OPTIONS    = "option name Hash type spin default 16 min 1 max 2048\noption name Clear Hash type button\noption name Threads type spin default 1 min -1 max 128\noption name SyzygyPath type string default syzygy\noption name UCI_Chess960 type check default false\noption name Variation type combo default standard var standard var chess960\noption name UseNNUE type check default false\noption name EvalFile type string default nn-7821938.nnue\noption name MultiPV type spin default 1 min 1 max 128\noption name NullMovePruning type check default true\noption name LateMoveReduction type check default true\noption name ReverseFutilityPruning type check default true\noption name LateMovePruning type check default true\noption name FutilityPruning type check default true\noption name CheckExtensions type check default true\noption name SingularExtensions type check default true\noption name AspirationWindow type check default true\noption name QuiescenceSearch type check default true\noption name UseTT type check default true\noption name KillerHeuristic type check default true\noption name HistoryHeuristic type check default true\noption name Ponder type check default false";
 
 /// 64-bit Zobrist position hash key
 using Key      = uint64_t;
@@ -153,6 +153,8 @@ constexpr uint8_t  MAX_PLY           = 246;
 constexpr uint8_t  MAX_DEPTH         = 64;
 constexpr uint8_t  FULL_DEPTH_MOVES  = 4;
 constexpr uint8_t  REDUCTION_LIMIT   = 3;
+
+inline bool is_chess960 = false;
 
 // ============================================================================
 // Core Chess Enums
@@ -198,12 +200,12 @@ constexpr Value VALUE_NONE             = 32002;
 constexpr Value VALUE_INFINITE         = 32001;
 
 constexpr Value VALUE_MATE             = 32000;
-constexpr Value VALUE_MATE_IN_MAX_PLY  = static_cast<Value>(VALUE_MATE - MAX_PLY);
-constexpr Value VALUE_MATED_IN_MAX_PLY = static_cast<Value>(-VALUE_MATE_IN_MAX_PLY);
+constexpr Value VALUE_MATE_IN_MAX_PLY  = VALUE_MATE - MAX_PLY;
+constexpr Value VALUE_MATED_IN_MAX_PLY = -VALUE_MATE_IN_MAX_PLY;
 
-constexpr Value VALUE_TB                 = static_cast<Value>(VALUE_MATE_IN_MAX_PLY - 1);
-constexpr Value VALUE_TB_WIN_IN_MAX_PLY  = static_cast<Value>(VALUE_TB - MAX_PLY);
-constexpr Value VALUE_TB_LOSS_IN_MAX_PLY = static_cast<Value>(-VALUE_TB_WIN_IN_MAX_PLY);
+constexpr Value VALUE_TB                 = VALUE_MATE_IN_MAX_PLY - 1;
+constexpr Value VALUE_TB_WIN_IN_MAX_PLY  = VALUE_TB - MAX_PLY;
+constexpr Value VALUE_TB_LOSS_IN_MAX_PLY = -VALUE_TB_WIN_IN_MAX_PLY;
 
 constexpr Value PawnValue   = 100;
 constexpr Value KnightValue = 320;
@@ -351,11 +353,11 @@ constexpr inline Square& operator-=(Square& s, Direction d) { return s = s - d; 
 // Core Helper Functions
 // ============================================================================
 [[nodiscard]] constexpr Value mate_in(int ply) { 
-    return static_cast<Value>(VALUE_MATE - ply); 
+    return VALUE_MATE - ply; 
 }
 
 [[nodiscard]] constexpr Value mated_in(int ply) { 
-    return static_cast<Value>(-VALUE_MATE + ply); 
+    return -VALUE_MATE + ply; 
 }
 
 [[nodiscard]] constexpr Square make_square(File f, Rank r) { 
@@ -504,11 +506,26 @@ public:
         if (*this == none()) return "none";
         if (*this == null()) return "0000";
 
+        Square from = from_sq();
+        Square to = to_sq();
+
+        if (type_of() == CASTLING && !is_chess960) {
+            bool is_kingside = (to > from);
+            Square king_to = is_kingside ? (rank_of(from) == RANK_1 ? SQ_G1 : SQ_G8) 
+                                         : (rank_of(from) == RANK_1 ? SQ_C1 : SQ_C8);
+            std::string s;
+            s += static_cast<char>('a' + std::to_underlying(file_of(from)));
+            s += static_cast<char>('1' + std::to_underlying(rank_of(from)));
+            s += static_cast<char>('a' + std::to_underlying(file_of(king_to)));
+            s += static_cast<char>('1' + std::to_underlying(rank_of(king_to)));
+            return s;
+        }
+
         std::string s;
-        s += static_cast<char>('a' + std::to_underlying(file_of(from_sq())));
-        s += static_cast<char>('1' + std::to_underlying(rank_of(from_sq())));
-        s += static_cast<char>('a' + std::to_underlying(file_of(to_sq())));
-        s += static_cast<char>('1' + std::to_underlying(rank_of(to_sq())));
+        s += static_cast<char>('a' + std::to_underlying(file_of(from)));
+        s += static_cast<char>('1' + std::to_underlying(rank_of(from)));
+        s += static_cast<char>('a' + std::to_underlying(file_of(to)));
+        s += static_cast<char>('1' + std::to_underlying(rank_of(to)));
 
         if (type_of() == PROMOTION) {
             PieceType pt = promotion_type();

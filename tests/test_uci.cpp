@@ -90,3 +90,43 @@ TEST_F(UCITest, BenchmarkExecution) {
     EXPECT_TRUE(keep_running);
     EXPECT_TRUE(buffer.str().find("Total Nodes") != std::string::npos);
 }
+
+// 6. Verify ucinewgame clears TT and stops active search
+TEST_F(UCITest, UCINewGame) {
+    UCI uci;
+    EXPECT_TRUE(uci.execute_line("ucinewgame"));
+    EXPECT_TRUE(Search::stopped.load());
+}
+
+// 7. Verify move history parser and connected StateInfo stack
+TEST_F(UCITest, PositionMovesParsing) {
+    UCI uci;
+    EXPECT_TRUE(uci.execute_line("position startpos moves e2e4 e7e5 g1f3 b8c6"));
+
+    // Compare against equivalent position loaded directly via set_fen
+    Position pos_expected;
+    StateInfo si_expected;
+    pos_expected.set_fen("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 1", si_expected);
+
+    EXPECT_EQ(uci.position().get_fen(), pos_expected.get_fen());
+    EXPECT_EQ(uci.position().key(), pos_expected.key());
+}
+
+// 8. Verify variation command selects standard and chess960
+TEST_F(UCITest, VariationCommand) {
+    UCI uci;
+    EXPECT_TRUE(uci.execute_line("variation chess960"));
+    EXPECT_TRUE(Position::is_chess960);
+
+    EXPECT_TRUE(uci.execute_line("variation standard"));
+    EXPECT_FALSE(Position::is_chess960);
+
+    EXPECT_TRUE(uci.execute_line("variation 960"));
+    EXPECT_TRUE(Position::is_chess960);
+
+    EXPECT_TRUE(uci.execute_line("variation"));
+    EXPECT_TRUE(Position::is_chess960);
+
+    // Reset back to standard for remaining tests
+    Position::is_chess960 = false;
+}

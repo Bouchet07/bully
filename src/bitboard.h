@@ -38,6 +38,11 @@ namespace Bully {
     return static_cast<Square>(std::countr_zero(b));
 }
 
+// Returns the index of the most significant bit set (Hardware LZCNT/BSR), assuming the bitboard is not empty.
+[[nodiscard]] constexpr Square msb(Bitboard b) {
+    return static_cast<Square>(63 - std::countl_zero(b));
+}
+
 // Returns the index of the least significant bit set and clears it from the bitboard.
 [[nodiscard]] constexpr inline Square pop_lsb(Bitboard& b) {
     Square s = lsb(b);
@@ -168,7 +173,7 @@ template<Direction D>
 }
 
 [[nodiscard]] inline bool aligned(Square s1, Square s2, Square s3) { 
-    return (line_bb(s1, s2) & s3) != 0; 
+    return (line_bb(s1, s2) & square_bb(s3)) != 0; 
 }
 
 } // namespace Bully

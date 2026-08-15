@@ -22,7 +22,7 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
     Piece pc = pos.piece_on(m.from_sq());
     PieceType pt = type_of(pc);
 
-    bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT);
+    bool is_cap = (m.type_of() != CASTLING) && ((pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION));
     if (is_cap) {
         out_see = pos.see(m);
         PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));

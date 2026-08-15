@@ -29,6 +29,9 @@ public:
     // Executes a single UCI command line. Returns false if 'quit' or 'exit' is executed.
     bool execute_line(const std::string& line);
 
+    // Position getter
+    [[nodiscard]] const Position& position() const { return pos; }
+
     // Prints command line arguments usage guide
     void print_arguments_help();
 

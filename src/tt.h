@@ -51,14 +51,14 @@ struct alignas(32) Cluster {
 
 // Convert scores to/from transposition table representation (normalizes mate scores)
 [[nodiscard]] inline Value score_to_tt(Value v, int ply) {
-    if (v >= VALUE_MATE_IN_MAX_PLY)  return static_cast<Value>(v + ply);
-    if (v <= VALUE_MATED_IN_MAX_PLY) return static_cast<Value>(v - ply);
+    if (v >= VALUE_MATE_IN_MAX_PLY)  return v + ply;
+    if (v <= VALUE_MATED_IN_MAX_PLY) return v - ply;
     return v;
 }
 
 [[nodiscard]] inline Value score_from_tt(Value v, int ply) {
-    if (v >= VALUE_MATE_IN_MAX_PLY)  return static_cast<Value>(v - ply);
-    if (v <= VALUE_MATED_IN_MAX_PLY) return static_cast<Value>(v + ply);
+    if (v >= VALUE_MATE_IN_MAX_PLY)  return v - ply;
+    if (v <= VALUE_MATED_IN_MAX_PLY) return v + ply;
     return v;
 }
 

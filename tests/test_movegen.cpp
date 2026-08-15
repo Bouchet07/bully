@@ -97,7 +97,7 @@ std::string move_to_string(Move m) {
 TEST_F(MoveGenTest, PerftPosition4) {
     Position pos;
     StateInfo si;
-    pos.set_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", si);
+    pos.set_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 21", si);
 
     EXPECT_EQ(perft(1, pos), 6ULL);
     EXPECT_EQ(perft(2, pos), 264ULL);
@@ -117,4 +117,37 @@ TEST_F(MoveGenTest, GenerateCaptures) {
     // There should only be exactly 1 capture (e4xd5) and no quiet moves (e.g. e4e5, d2d3)
     EXPECT_EQ(list.size(), 1);
     EXPECT_EQ(list[0].move, Move(SQ_E4, SQ_D5));
+}
+
+// 6. Position 5 - Pinned pieces and pawn promotions
+TEST_F(MoveGenTest, PerftPosition5) {
+    Position pos;
+    StateInfo si;
+    pos.set_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", si);
+
+    EXPECT_EQ(perft(1, pos), 44ULL);
+    EXPECT_EQ(perft(2, pos), 1486ULL);
+    EXPECT_EQ(perft(3, pos), 62379ULL);
+}
+
+// 7. Position 6 - Middlegame tactical pins
+TEST_F(MoveGenTest, PerftPosition6) {
+    Position pos;
+    StateInfo si;
+    pos.set_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", si);
+
+    EXPECT_EQ(perft(1, pos), 46ULL);
+    EXPECT_EQ(perft(2, pos), 2079ULL);
+    EXPECT_EQ(perft(3, pos), 89890ULL);
+}
+
+// 8. Horizontal En Passant Pin test
+TEST_F(MoveGenTest, HorizontalEnPassantPin) {
+    Position pos;
+    StateInfo si;
+    // King on A5, White Pawn on E5, Black Pawn on D5 (just pushed d7-d5 -> e.p. sq d6), Black Rook on H5
+    pos.set_fen("8/8/8/K2pP2r/8/8/8/8 w - d6 0 1", si);
+
+    Move ep_move = Move::make<EN_PASSANT>(SQ_E5, SQ_D6);
+    EXPECT_FALSE(pos.legal(ep_move));
 }

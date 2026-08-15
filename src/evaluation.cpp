@@ -140,10 +140,7 @@ constexpr std::array<Bitboard, SQUARE_NB> FrontSpansBlack = []() {
     phase -= (4 - rooks) * 2;
     phase -= (2 - queens) * 4;
 
-    if (phase < 0)  phase = 0;
-    if (phase > 24) phase = 24;
-    
-    return phase;
+    return std::clamp(phase, 0, 24);
 }
 
 template<Color Us>
@@ -163,8 +160,8 @@ template<Color Us>
         Square rel_sq = relative_square(Us, sq);
         size_t idx = to_index(rel_sq);
         
-        int p_mg = PawnPST[idx];
-        int p_eg = PawnPST[idx];
+        Value p_mg = PawnPST[idx];
+        Value p_eg = PawnPST[idx];
         
         File f = file_of(sq);
         Bitboard adjacent = AdjacentFiles[to_index(f)];
@@ -191,8 +188,8 @@ template<Color Us>
             p_eg += 20 * rel_rank;
         }
         
-        mg = static_cast<Value>(mg + PawnValue + p_mg);
-        eg = static_cast<Value>(eg + PawnValue + p_eg);
+        mg += PawnValue + p_mg;
+        eg += PawnValue + p_eg;
     }
     
     return { mg, eg };
@@ -208,8 +205,8 @@ template<Color Us>
         Square sq = lsb(knights);
         knights &= knights - 1;
         size_t idx = to_index(relative_square(Us, sq));
-        mg = static_cast<Value>(mg + KnightValue + KnightPST[idx]);
-        eg = static_cast<Value>(eg + KnightValue + KnightPST[idx]);
+        mg += KnightValue + KnightPST[idx];
+        eg += KnightValue + KnightPST[idx];
     }
     
     Bitboard bishops = pos.pieces(Us, BISHOP);
@@ -217,8 +214,8 @@ template<Color Us>
         Square sq = lsb(bishops);
         bishops &= bishops - 1;
         size_t idx = to_index(relative_square(Us, sq));
-        mg = static_cast<Value>(mg + BishopValue + BishopPST[idx]);
-        eg = static_cast<Value>(eg + BishopValue + BishopPST[idx]);
+        mg += BishopValue + BishopPST[idx];
+        eg += BishopValue + BishopPST[idx];
     }
     
     Bitboard rooks = pos.pieces(Us, ROOK);
@@ -226,8 +223,8 @@ template<Color Us>
         Square sq = lsb(rooks);
         rooks &= rooks - 1;
         size_t idx = to_index(relative_square(Us, sq));
-        mg = static_cast<Value>(mg + RookValue + RookPST[idx]);
-        eg = static_cast<Value>(eg + RookValue + RookPST[idx]);
+        mg += RookValue + RookPST[idx];
+        eg += RookValue + RookPST[idx];
     }
     
     Bitboard queens = pos.pieces(Us, QUEEN);
@@ -235,23 +232,23 @@ template<Color Us>
         Square sq = lsb(queens);
         queens &= queens - 1;
         size_t idx = to_index(relative_square(Us, sq));
-        mg = static_cast<Value>(mg + QueenValue + QueenPST[idx]);
-        eg = static_cast<Value>(eg + QueenValue + QueenPST[idx]);
+        mg += QueenValue + QueenPST[idx];
+        eg += QueenValue + QueenPST[idx];
     }
     
     Bitboard king = pos.pieces(Us, KING);
     if (king) {
         Square sq = get_LSB(king);
         size_t idx = to_index(relative_square(Us, sq));
-        mg = static_cast<Value>(mg + KingMiddlegamePST[idx]);
-        eg = static_cast<Value>(eg + KingEndgamePST[idx]);
+        mg += KingMiddlegamePST[idx];
+        eg += KingEndgamePST[idx];
     }
     
     // Bishop pair bonus
     int bishop_count = popcnt(pos.pieces(Us, BISHOP));
     if (bishop_count >= 2) {
-        mg = static_cast<Value>(mg + 30);
-        eg = static_cast<Value>(eg + 40);
+        mg += 30;
+        eg += 40;
     }
     
     return { mg, eg };
@@ -268,20 +265,20 @@ Value evaluate(const Position& pos) {
     auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
     auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
     
-    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
-    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    Value mg_white = mg_white_pawns + mg_white_pieces;
+    Value eg_white = eg_white_pawns + eg_white_pieces;
     
-    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
-    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    Value mg_black = mg_black_pawns + mg_black_pieces;
+    Value eg_black = eg_black_pawns + eg_black_pieces;
     
     int phase = calculate_phase(pos);
     
-    Value mg_score = static_cast<Value>(mg_white - mg_black);
-    Value eg_score = static_cast<Value>(eg_white - eg_black);
+    Value mg_score = mg_white - mg_black;
+    Value eg_score = eg_white - eg_black;
     
-    Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
+    Value score = (mg_score * phase + eg_score * (24 - phase)) / 24;
     
-    return (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
+    return (pos.side_to_move() == WHITE) ? score : -score;
 }
 
 void print_detailed_eval(const Position& pos, bool use_color) {
@@ -291,19 +288,19 @@ void print_detailed_eval(const Position& pos, bool use_color) {
     auto [mg_black_pawns, eg_black_pawns] = evaluate_pawns<BLACK>(pos);
     auto [mg_black_pieces, eg_black_pieces] = evaluate_pieces<BLACK>(pos);
     
-    Value mg_white = static_cast<Value>(mg_white_pawns + mg_white_pieces);
-    Value eg_white = static_cast<Value>(eg_white_pawns + eg_white_pieces);
+    Value mg_white = mg_white_pawns + mg_white_pieces;
+    Value eg_white = eg_white_pawns + eg_white_pieces;
     
-    Value mg_black = static_cast<Value>(mg_black_pawns + mg_black_pieces);
-    Value eg_black = static_cast<Value>(eg_black_pawns + eg_black_pieces);
+    Value mg_black = mg_black_pawns + mg_black_pieces;
+    Value eg_black = eg_black_pawns + eg_black_pieces;
     
     int phase = calculate_phase(pos);
     
-    Value mg_score = static_cast<Value>(mg_white - mg_black);
-    Value eg_score = static_cast<Value>(eg_white - eg_black);
+    Value mg_score = mg_white - mg_black;
+    Value eg_score = eg_white - eg_black;
     
-    Value score = static_cast<Value>((mg_score * phase + eg_score * (24 - phase)) / 24);
-    Value relative_score = (pos.side_to_move() == WHITE) ? score : static_cast<Value>(-score);
+    Value score = (mg_score * phase + eg_score * (24 - phase)) / 24;
+    Value relative_score = (pos.side_to_move() == WHITE) ? score : -score;
 
     std::string reset   = use_color ? "\033[0m" : "";
     std::string yellow  = use_color ? "\033[1;33m" : "";
@@ -327,9 +324,9 @@ void print_detailed_eval(const Position& pos, bool use_color) {
     std::cout << std::format("  Total Term         |   {:4} / {:4}   |   {:4} / {:4}   \n", 
                  mg_white, eg_white, mg_black, eg_black);
     std::cout << blue << "--------------------------------------------------------\n" << reset;
-    std::cout << std::format("  {}Middlegame Score{}   : {}{:+6}{}\n", green, reset, magenta, mg_score, reset);
-    std::cout << std::format("  {}Endgame Score{}      : {}{:+6}{}\n", green, reset, magenta, eg_score, reset);
-    std::cout << std::format("  {}Interpolated Score{} : {}{:+6}{}\n", green, reset, magenta, score, reset);
+    std::cout << std::format("  {}Middlegame Score{}    : {}{:+6}{}\n", green, reset, magenta, mg_score, reset);
+    std::cout << std::format("  {}Endgame Score{}       : {}{:+6}{}\n", green, reset, magenta, eg_score, reset);
+    std::cout << std::format("  {}Interpolated Score{}  : {}{:+6}{}\n", green, reset, magenta, score, reset);
     std::cout << std::format("  {}Classical Rel Score{} : {}{:+6}{} (relative to {})\n", 
                  green, reset, magenta, relative_score, reset, pos.side_to_move() == WHITE ? "White" : "Black");
     std::cout << blue << "--------------------------------------------------------\n" << reset;

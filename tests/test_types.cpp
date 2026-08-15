@@ -280,6 +280,8 @@ TEST(SquareTest, SumDirectionOperators) {
 	EXPECT_EQ(sq_a1 + e, SQ_B1);
 
 	EXPECT_EQ(sq_h1 + n, SQ_H2);
+	// Note: sq_h1 + e (7 + 1 = 8 = SQ_A2) is an unchecked raw integer coordinate step.
+	// Chessboard file-wrapping boundary checks are performed separately where appropriate.
 	EXPECT_EQ(sq_h1 + e, SQ_A2);
 }
 
@@ -447,8 +449,23 @@ TEST(SquareTest, RelativeSquare) {
 
 // Relative rank
 TEST(SquareTest, RelativeRank) {
+	EXPECT_EQ(relative_rank(WHITE, RANK_1), RANK_1);
+	EXPECT_EQ(relative_rank(WHITE, RANK_2), RANK_2);
+	EXPECT_EQ(relative_rank(WHITE, RANK_3), RANK_3);
+	EXPECT_EQ(relative_rank(WHITE, RANK_4), RANK_4);
+	EXPECT_EQ(relative_rank(WHITE, RANK_5), RANK_5);
+	EXPECT_EQ(relative_rank(WHITE, RANK_6), RANK_6);
 	EXPECT_EQ(relative_rank(WHITE, RANK_7), RANK_7);
+	EXPECT_EQ(relative_rank(WHITE, RANK_8), RANK_8);
+
+	EXPECT_EQ(relative_rank(BLACK, RANK_1), RANK_8);
+	EXPECT_EQ(relative_rank(BLACK, RANK_2), RANK_7);
+	EXPECT_EQ(relative_rank(BLACK, RANK_3), RANK_6);
+	EXPECT_EQ(relative_rank(BLACK, RANK_4), RANK_5);
+	EXPECT_EQ(relative_rank(BLACK, RANK_5), RANK_4);
+	EXPECT_EQ(relative_rank(BLACK, RANK_6), RANK_3);
 	EXPECT_EQ(relative_rank(BLACK, RANK_7), RANK_2);
+	EXPECT_EQ(relative_rank(BLACK, RANK_8), RANK_1);
 }
 
 // Pawn push direction

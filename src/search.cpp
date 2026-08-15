@@ -146,7 +146,7 @@ void SearchState::check_limits() {
 static Value evaluate_position(const Position& pos, const SearchState& ss) {
     Value v = Eval::evaluate(pos);
     int corr = ss.correction_history ? ss.correction_history->get_correction(pos) : 0;
-    return static_cast<Value>(std::clamp(v + corr, -VALUE_TB + 1, VALUE_TB - 1));
+    return std::clamp(v + corr, -VALUE_TB + 1, VALUE_TB - 1);
 }
 
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
@@ -229,8 +229,8 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     if (ply > 0 && Syzygy::max_cardinality > 0) {
         Value tb_val = Syzygy::probe_wdl(pos);
-        if (tb_val == VALUE_TB_WIN_IN_MAX_PLY) return static_cast<Value>(tb_val - ply);
-        if (tb_val == -VALUE_TB_WIN_IN_MAX_PLY) return static_cast<Value>(tb_val + ply);
+        if (tb_val == VALUE_TB_WIN_IN_MAX_PLY) return tb_val - ply;
+        if (tb_val == -VALUE_TB_WIN_IN_MAX_PLY) return tb_val + ply;
         if (tb_val != VALUE_NONE) return tb_val;
     }
 
@@ -277,7 +277,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         && !ss.singular_search) {
 
         int singular_margin = depth * 2;
-        Value singular_beta = static_cast<Value>(tt_score - singular_margin);
+        Value singular_beta = tt_score - singular_margin;
         int singular_depth = (depth - 1) / 2;
 
         Move saved_excluded = ss.excluded_move;
@@ -343,27 +343,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         if (m == ss.excluded_move) {
             continue;
         }
-        bool is_cap = (pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION);
-        if (!is_cap) {
-            quiet_moves_searched++;
-
-            // Late Move Pruning (LMP): Prune quiet moves at low depths when count exceeds threshold
-            if (use_lmp && !in_check && depth < 4) {
-                int lmp_threshold = 3 + depth * depth;
-                if (quiet_moves_searched > lmp_threshold) {
-                    continue;
-                }
-            }
-
-            // Futility Pruning: Prune quiet moves at depth 1 when evaluation is far below alpha
-            if (use_fp && !in_check && depth == 1) {
-                int margin = 150;
-                if (static_eval + margin < alpha) {
-                    continue;
-                }
-            }
-        }
-
+        bool is_cap = (m.type_of() != CASTLING) && ((pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION));
         StateInfo next_si;
         if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
             next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
@@ -374,6 +354,29 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
         legal_moves++;
         ss.nodes++;
+        bool gives_check = pos.in_check();
+
+        if (!is_cap) {
+            quiet_moves_searched++;
+
+            // Late Move Pruning (LMP): Prune quiet non-checking moves at low depths when count exceeds threshold
+            if (use_lmp && !gives_check && !in_check && depth < 4) {
+                int lmp_threshold = 3 + depth * depth;
+                if (quiet_moves_searched > lmp_threshold) {
+                    pos.unmake_move(m);
+                    continue;
+                }
+            }
+        }
+
+        // Futility Pruning: Prune quiet non-checking moves at depth 1 when evaluation is far below alpha
+        if (use_fp && !is_cap && !gives_check && !in_check && depth == 1) {
+            int margin = 150;
+            if (static_eval + margin < alpha) {
+                pos.unmake_move(m);
+                continue;
+            }
+        }
 
         if (!is_cap && quiet_count < 64) {
             quiet_moves[static_cast<size_t>(quiet_count++)] = m;
@@ -384,7 +387,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m, prev_move);
         } else {
             int reduction = 0;
-            if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !in_check) {
+            if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !gives_check && !in_check) {
                 int d_idx = std::min(static_cast<int>(depth), static_cast<int>(MAX_PLY - 1));
                 int m_idx = std::min(legal_moves, static_cast<int>(MAX_MOVES - 1));
                 reduction = Reductions[d_idx][m_idx];
@@ -842,8 +845,8 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             int delta = 35;
 
             if (use_aspiration_window && d >= 5) {
-                alpha = static_cast<Value>(std::max(static_cast<int>(last_score) - delta, -static_cast<int>(VALUE_INFINITE)));
-                beta = static_cast<Value>(std::min(static_cast<int>(last_score) + delta, static_cast<int>(VALUE_INFINITE)));
+                alpha = std::max(last_score - delta, -VALUE_INFINITE);
+                beta = std::min(last_score + delta, VALUE_INFINITE);
             }
 
             Value score = VALUE_ZERO;
@@ -856,12 +859,12 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 if (score <= alpha) {
                     beta = alpha;
-                    alpha = static_cast<Value>(std::max(static_cast<int>(alpha) - delta, -static_cast<int>(VALUE_INFINITE)));
+                    alpha = std::max(alpha - delta, -VALUE_INFINITE);
                     delta += delta / 2;
                 }
                 else if (score >= beta) {
                     alpha = beta;
-                    beta = static_cast<Value>(std::min(static_cast<int>(beta) + delta, static_cast<int>(VALUE_INFINITE)));
+                    beta = std::min(beta + delta, VALUE_INFINITE);
                     delta += delta / 2;
                 }
                 else {
@@ -1004,6 +1007,10 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 }
             }
         }
+    }
+
+    if (use_tt && best_move.is_ok()) {
+        TT.save(main_worker->pos.key(), best_move, last_score, VALUE_NONE, max_search_depth, BOUND_EXACT, 0);
     }
 
     uint64_t total = 0;
