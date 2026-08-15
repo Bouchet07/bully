@@ -192,7 +192,8 @@ enum Bound : uint8_t {
 // ============================================================================
 // Evaluation Scores & Piece Values
 // ============================================================================
-using Value = int;
+using Value = int; // Evaluation score in centipawns (cp) or mate distance in plies
+                   // int (32-bit) instead of int16_t to avoid sign conversion warnings
 
 constexpr Value VALUE_ZERO             = 0;
 constexpr Value VALUE_DRAW             = 0;
@@ -373,7 +374,7 @@ constexpr inline Square& operator-=(Square& s, Direction d) { return s = s - d; 
 }
 
 [[nodiscard]] constexpr Color color_of(Piece pc) { 
-    return static_cast<Color>(std::to_underlying(pc) < 8 ? WHITE : BLACK); 
+    return std::to_underlying(pc) < 8 ? WHITE : BLACK; 
 }
 
 [[nodiscard]] constexpr Value get_piece_value(PieceType pt) {
@@ -432,6 +433,13 @@ template<typename T> requires std::is_integral_v<T>
     return static_cast<size_t>(val);
 }
 
+enum MoveType : uint16_t {
+    NORMAL     = 0,
+    PROMOTION  = 1 << 14,
+    EN_PASSANT = 2 << 14,
+    CASTLING   = 3 << 14
+};
+
 // ============================================================================
 // Move Encoding Class
 // ============================================================================
@@ -448,13 +456,6 @@ template<typename T> requires std::is_integral_v<T>
 // - Bits 6-11:  Origin square index (0 to 63)
 // - Bits 12-13: Promotion piece offset (0 = Knight, 1 = Bishop, 2 = Rook, 3 = Queen)
 // - Bits 14-15: Move type flag (0 = Normal, 1 = Promotion, 2 = En Passant, 3 = Castling)
-enum MoveType : uint16_t {
-    NORMAL     = 0,
-    PROMOTION  = 1 << 14,
-    EN_PASSANT = 2 << 14,
-    CASTLING   = 3 << 14
-};
-
 class Move {
 public:
     Move() = default;
@@ -467,10 +468,10 @@ public:
     template<MoveType T>
     [[nodiscard]] static constexpr Move make(Square from, Square to, PieceType pt = KNIGHT) {
         return Move(static_cast<uint16_t>(
-            static_cast<uint16_t>(T) + 
-            static_cast<uint16_t>((std::to_underlying(pt) - std::to_underlying(KNIGHT)) << 12) + 
-            static_cast<uint16_t>(std::to_underlying(from) << 6) + 
-            static_cast<uint16_t>(std::to_underlying(to))
+            std::to_underlying(T) + 
+            ((std::to_underlying(pt) - std::to_underlying(KNIGHT)) << 12) + 
+            (std::to_underlying(from) << 6) + 
+            std::to_underlying(to)
         ));
     }
 

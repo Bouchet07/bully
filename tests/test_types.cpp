@@ -534,3 +534,16 @@ TEST(MoveTest, ToIndexHelper) {
 	EXPECT_EQ(to_index(BLACK), 1);
 	EXPECT_EQ(to_index(PAWN), 1);
 }
+
+// Move trivial copyable and standard layout verification
+TEST(MoveTest, TriviallyCopyable) {
+	static_assert(std::is_trivially_copyable_v<Move>, "Move must be trivially copyable");
+	static_assert(std::is_trivially_destructible_v<Move>, "Move must be trivially destructible");
+	static_assert(std::is_standard_layout_v<Move>, "Move must be standard layout");
+	static_assert(sizeof(Move) == 2, "Move memory size must be exactly 2 bytes");
+
+	EXPECT_TRUE(std::is_trivially_copyable_v<Move>);
+	EXPECT_TRUE(std::is_trivially_destructible_v<Move>);
+	EXPECT_TRUE(std::is_standard_layout_v<Move>);
+	EXPECT_EQ(sizeof(Move), 2u);
+}
