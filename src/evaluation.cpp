@@ -154,8 +154,7 @@ template<Color Us>
     
     Bitboard pawns = our_pawns;
     while (pawns) {
-        Square sq = lsb(pawns);
-        pawns &= pawns - 1;
+        Square sq = pop_lsb(pawns);
         
         Square rel_sq = relative_square(Us, sq);
         size_t idx = to_index(rel_sq);
@@ -174,7 +173,7 @@ template<Color Us>
         
         // Doubled Pawn Penalty (once per file, when sq is the LSB on that file)
         Bitboard same_file = our_pawns & file_bb(sq);
-        if (more_than_one(same_file) && sq == get_LSB(same_file)) {
+        if (more_than_one(same_file) && sq == lsb(same_file)) {
             p_mg -= 15;
             p_eg -= 15;
         }
@@ -202,8 +201,7 @@ template<Color Us>
     
     Bitboard knights = pos.pieces(Us, KNIGHT);
     while (knights) {
-        Square sq = lsb(knights);
-        knights &= knights - 1;
+        Square sq = pop_lsb(knights);
         size_t idx = to_index(relative_square(Us, sq));
         mg += KnightValue + KnightPST[idx];
         eg += KnightValue + KnightPST[idx];
@@ -211,8 +209,7 @@ template<Color Us>
     
     Bitboard bishops = pos.pieces(Us, BISHOP);
     while (bishops) {
-        Square sq = lsb(bishops);
-        bishops &= bishops - 1;
+        Square sq = pop_lsb(bishops);
         size_t idx = to_index(relative_square(Us, sq));
         mg += BishopValue + BishopPST[idx];
         eg += BishopValue + BishopPST[idx];
@@ -220,8 +217,7 @@ template<Color Us>
     
     Bitboard rooks = pos.pieces(Us, ROOK);
     while (rooks) {
-        Square sq = lsb(rooks);
-        rooks &= rooks - 1;
+        Square sq = pop_lsb(rooks);
         size_t idx = to_index(relative_square(Us, sq));
         mg += RookValue + RookPST[idx];
         eg += RookValue + RookPST[idx];
@@ -229,8 +225,7 @@ template<Color Us>
     
     Bitboard queens = pos.pieces(Us, QUEEN);
     while (queens) {
-        Square sq = lsb(queens);
-        queens &= queens - 1;
+        Square sq = pop_lsb(queens);
         size_t idx = to_index(relative_square(Us, sq));
         mg += QueenValue + QueenPST[idx];
         eg += QueenValue + QueenPST[idx];
@@ -238,7 +233,7 @@ template<Color Us>
     
     Bitboard king = pos.pieces(Us, KING);
     if (king) {
-        Square sq = get_LSB(king);
+        Square sq = lsb(king);
         size_t idx = to_index(relative_square(Us, sq));
         mg += KingMiddlegamePST[idx];
         eg += KingEndgamePST[idx];
