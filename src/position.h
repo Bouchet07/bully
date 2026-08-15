@@ -115,7 +115,7 @@ public:
 
     [[nodiscard]] Piece piece_on(Square s) const { return board[to_index(s)]; }
     [[nodiscard]] Color side_to_move() const { return side_to_move_color; }
-    [[nodiscard]] Square king_square(Color c) const { return get_LSB(pieces(c, KING)); }
+    [[nodiscard]] Square king_square(Color c) const { return lsb(pieces(c, KING)); }
     
     [[nodiscard]] Key key() const { return st->key; }
     [[nodiscard]] Key pawn_key() const;
