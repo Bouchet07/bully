@@ -127,13 +127,28 @@ uint64_t UCI::run_perft(int depth) {
 
 Move UCI::parse_move(const std::string& move_str) {
     MoveList list;
-    list.generate(pos);
+    list.generate_legal(pos);
+    
+    // 1. Strict UCI Coordinate Parsing
     for (size_t i = 0; i < list.size(); ++i) {
         Move m = list[i].move;
         if (m.to_string() == move_str) {
             return m;
         }
     }
+    
+    // 2. Buggy GUI Fallback (Tolerate PGN/SAN castling notation sent over UCI)
+    if (move_str == "O-O" || move_str == "O-O-O" || move_str == "0-0" || move_str == "0-0-0") {
+        for (size_t i = 0; i < list.size(); ++i) {
+            Move m = list[i].move;
+            if (m.type_of() == CASTLING) {
+                bool is_kingside = (m.to_sq() > m.from_sq());
+                if (is_kingside && (move_str == "O-O" || move_str == "0-0")) return m;
+                if (!is_kingside && (move_str == "O-O-O" || move_str == "0-0-0")) return m;
+            }
+        }
+    }
+    
     return Move::none();
 }
 

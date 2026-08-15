@@ -130,3 +130,16 @@ TEST_F(UCITest, VariationCommand) {
     // Reset back to standard for remaining tests
     Position::is_chess960 = false;
 }
+
+// 9. Verify SAN / PGN castling fallback parsing (O-O, O-O-O, 0-0, 0-0-0)
+TEST_F(UCITest, SANCastlingFallback) {
+    UCI uci;
+    EXPECT_TRUE(uci.execute_line("position startpos moves e2e4 e7e5 g1f3 b8c6 f1c4 d7d6 O-O"));
+    EXPECT_EQ(uci.position().piece_on(SQ_G1), make_piece(WHITE, KING));
+    EXPECT_EQ(uci.position().piece_on(SQ_F1), make_piece(WHITE, ROOK));
+
+    UCI uci2;
+    EXPECT_TRUE(uci2.execute_line("position startpos moves e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8e7 O-O O-O"));
+    EXPECT_EQ(uci2.position().piece_on(SQ_G8), make_piece(BLACK, KING));
+    EXPECT_EQ(uci2.position().piece_on(SQ_F8), make_piece(BLACK, ROOK));
+}
