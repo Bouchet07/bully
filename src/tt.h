@@ -12,6 +12,9 @@
 
 #include <array>
 #include <memory>
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+    #include <xmmintrin.h>
+#endif
 #include "types.h"
 
 namespace Bully {
@@ -76,6 +79,18 @@ public:
 
     // Clear all entries (resets the table)
     void clear();
+
+    // Issue a hardware prefetch instruction for a specific key's cluster
+    inline void prefetch(Key key) const {
+        if (!table || cluster_count == 0) return;
+        size_t idx = key & (cluster_count - 1);
+        
+#if defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(&table[idx]);
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        _mm_prefetch(reinterpret_cast<const char*>(&table[idx]), _MM_HINT_T0);
+#endif
+    }
 
     // Probe the table for a position. Returns true if hit and satisfies verification
     bool probe(Key key, Move& move, Value& score, Value& eval, int& depth, Bound& bound, int ply);

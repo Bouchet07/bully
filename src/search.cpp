@@ -150,6 +150,8 @@ static Value evaluate_position(const Position& pos, const SearchState& ss) {
 }
 
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
+    if (use_tt) TT.prefetch(pos.key());
+
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
     }
@@ -217,6 +219,8 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 }
 
 static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics, Move prev_move = Move::none(), Move prev_move_2 = Move::none()) {
+    if (use_tt) TT.prefetch(pos.key());
+
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
     }
