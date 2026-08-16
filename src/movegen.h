@@ -15,11 +15,10 @@
 
 namespace Bully {
 
-// ExtMove contains a Move, a score value used for sorting, and cached SEE evaluation
+// ExtMove contains a Move and a score value used for sorting
 struct ExtMove {
     Move move;
     int  value;
-    Value see_score = VALUE_NONE;
 
     constexpr bool operator==(const ExtMove& other) const { return move == other.move; }
     constexpr bool operator!=(const ExtMove& other) const { return move != other.move; }

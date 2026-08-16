@@ -15,29 +15,8 @@ MovePicker::MovePicker(const Position& pos, Move tt_move, int ply, const Search:
     }
 }
 
-static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move prev_move_2, const Position& pos, int ply, const Search::Heuristics* heuristics, Value& out_see) {
-    out_see = VALUE_NONE;
-    if (m == tt_move) return 1000000;
-
-    Piece pc = pos.piece_on(m.from_sq());
-    PieceType pt = type_of(pc);
-
-    bool is_cap = (m.type_of() != CASTLING) && ((pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION));
-    if (is_cap) {
-        out_see = pos.see(m);
-        PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
-        
-        int cap_hist = 0;
-        if (heuristics && heuristics->shared && Search::config.history) {
-            cap_hist = heuristics->shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].load(std::memory_order_relaxed) / 32;
-        }
-
-        if (out_see < 0) {
-            return 10000 + out_see + cap_hist;
-        }
-        return 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(pt) + cap_hist;
-    }
-
+// Dedicated scorer for quiet moves to avoid branch overhead
+static inline int score_quiet(Move m, Move prev_move, Move prev_move_2, const Position& pos, int ply, const Search::Heuristics* heuristics) {
     int score = 0;
 
     if (heuristics && Search::config.killers) {
@@ -48,6 +27,7 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
     }
 
     if (heuristics && heuristics->shared && Search::config.history) {
+        Piece pc = pos.piece_on(m.from_sq());
         score += heuristics->shared->history[to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
 
         if (prev_move.is_ok()) {
@@ -70,7 +50,6 @@ static inline int score_move_picker(Move m, Move tt_move, Move prev_move, Move p
             }
         }
     }
-
     return score;
 }
 
@@ -79,8 +58,12 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
         switch (stage_) {
             case Stage::MAIN_TT: {
                 stage_ = Stage::CAPTURE_INIT;
-                if (tt_move_.is_ok() && skip_bad_captures && pos.see(tt_move_) < 0) {
-                    break;
+                // Lazy SEE check for TT move
+                if (tt_move_.is_ok() && skip_bad_captures) {
+                    bool is_cap = (tt_move_.type_of() != CASTLING) && ((pos.piece_on(tt_move_.to_sq()) != NO_PIECE) || (tt_move_.type_of() == EN_PASSANT) || (tt_move_.type_of() == PROMOTION));
+                    if (is_cap && pos.see(tt_move_) < 0) {
+                        break;
+                    }
                 }
                 return tt_move_;
             }
@@ -88,7 +71,19 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
             case Stage::CAPTURE_INIT: {
                 list_.generate_captures(pos);
                 for (size_t i = 0; i < list_.size(); ++i) {
-                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, prev_move_2_, pos, ply_, heuristics_, list_[i].see_score);
+                    Move m = list_[i].move;
+                    if (m == tt_move_) {
+                        list_[i].value = 1000000;
+                    } else {
+                        // MVV-LVA Scoring (No SEE calculations here!)
+                        Piece pc = pos.piece_on(m.from_sq());
+                        PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
+                        int cap_hist = 0;
+                        if (heuristics_ && heuristics_->shared && Search::config.history) {
+                            cap_hist = heuristics_->shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].load(std::memory_order_relaxed) / 32;
+                        }
+                        list_[i].value = 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(type_of(pc)) + cap_hist;
+                    }
                 }
                 current_idx_ = 0;
                 stage_ = Stage::GOOD_CAPTURES;
@@ -97,9 +92,12 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
 
             case Stage::GOOD_CAPTURES: {
                 while (current_idx_ < list_.size()) {
+                    // Register-cached Selection Sort
                     size_t best_idx = current_idx_;
+                    int best_val = list_[current_idx_].value;
                     for (size_t j = current_idx_ + 1; j < list_.size(); ++j) {
-                        if (list_[j].value > list_[best_idx].value) {
+                        if (list_[j].value > best_val) {
+                            best_val = list_[j].value;
                             best_idx = j;
                         }
                     }
@@ -108,7 +106,8 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
 
                     if (em.move == tt_move_) continue;
 
-                    if (em.see_score < 0) {
+                    // Lazy SEE Evaluation!
+                    if (pos.see(em.move) < 0) {
                         if (!skip_bad_captures) {
                             bad_captures_[bad_capture_count_++] = em;
                         }
@@ -127,7 +126,8 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
                 }
                 list_.generate_quiets(pos);
                 for (size_t i = 0; i < list_.size(); ++i) {
-                    list_[i].value = score_move_picker(list_[i].move, tt_move_, prev_move_, prev_move_2_, pos, ply_, heuristics_, list_[i].see_score);
+                    Move m = list_[i].move;
+                    list_[i].value = (m == tt_move_) ? 1000000 : score_quiet(m, prev_move_, prev_move_2_, pos, ply_, heuristics_);
                 }
                 current_idx_ = 0;
                 stage_ = Stage::QUIETS;
@@ -136,9 +136,12 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
 
             case Stage::QUIETS: {
                 while (current_idx_ < list_.size()) {
+                    // Register-cached Selection Sort
                     size_t best_idx = current_idx_;
+                    int best_val = list_[current_idx_].value;
                     for (size_t j = current_idx_ + 1; j < list_.size(); ++j) {
-                        if (list_[j].value > list_[best_idx].value) {
+                        if (list_[j].value > best_val) {
+                            best_val = list_[j].value;
                             best_idx = j;
                         }
                     }

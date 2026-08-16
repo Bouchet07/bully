@@ -50,8 +50,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
         Bitboard quiet_pushes = single_pushes & ~rank_bb(promo_rank) & check_mask;
 
         while (quiet_pushes) {
-            Square to = lsb(quiet_pushes);
-            quiet_pushes &= quiet_pushes - 1;
+            Square to = pop_lsb(quiet_pushes);
             Square from = to - Up;
             *list++ = ExtMove{Move(from, to), 0};
         }
@@ -72,8 +71,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
         Bitboard double_pushes = shift<Up>(single_pushes & rank_bb(double_push_rank)) & empty_squares & check_mask;
 
         while (double_pushes) {
-            Square to = lsb(double_pushes);
-            double_pushes &= double_pushes - 1;
+            Square to = pop_lsb(double_pushes);
             Square from = to - UpUp;
             *list++ = ExtMove{Move(from, to), 0};
         }
@@ -107,8 +105,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
         }
 
         while (quiet_right) {
-            Square to = lsb(quiet_right);
-            quiet_right &= quiet_right - 1;
+            Square to = pop_lsb(quiet_right);
             Square from = to - UpEast;
             *list++ = ExtMove{Move(from, to), 0};
         }
@@ -129,8 +126,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
             Square cap_sq = ep_sq - Up;
             Bitboard ep_pawns = pawns & pawn_attacks(~Us, ep_sq);
             while (ep_pawns) {
-                Square from = lsb(ep_pawns);
-                ep_pawns &= ep_pawns - 1;
+                Square from = pop_lsb(ep_pawns);
 
                 if ((square_bb(cap_sq) & check_mask) || (square_bb(ep_sq) & check_mask)) {
                     *list++ = ExtMove{Move::make<EN_PASSANT>(from, ep_sq), 0};
@@ -144,48 +140,40 @@ ExtMove* generate_all(const Position& pos, ExtMove* list) {
     // ------------------------------------------------------------------------
     Bitboard knights = pos.pieces(Us, KNIGHT);
     while (knights) {
-        Square from = lsb(knights);
-        knights &= knights - 1;
+        Square from = pop_lsb(knights);
         Bitboard targets = knight_attacks(from) & target_squares;
         while (targets) {
-            Square to = lsb(targets);
-            targets &= targets - 1;
+            Square to = pop_lsb(targets);
             *list++ = ExtMove{Move(from, to), 0};
         }
     }
 
     Bitboard bishops = pos.pieces(Us, BISHOP);
     while (bishops) {
-        Square from = lsb(bishops);
-        bishops &= bishops - 1;
+        Square from = pop_lsb(bishops);
         Bitboard targets = bishop_attacks(from, occupied_squares) & target_squares;
         while (targets) {
-            Square to = lsb(targets);
-            targets &= targets - 1;
+            Square to = pop_lsb(targets);
             *list++ = ExtMove{Move(from, to), 0};
         }
     }
 
     Bitboard rooks = pos.pieces(Us, ROOK);
     while (rooks) {
-        Square from = lsb(rooks);
-        rooks &= rooks - 1;
+        Square from = pop_lsb(rooks);
         Bitboard targets = rook_attacks(from, occupied_squares) & target_squares;
         while (targets) {
-            Square to = lsb(targets);
-            targets &= targets - 1;
+            Square to = pop_lsb(targets);
             *list++ = ExtMove{Move(from, to), 0};
         }
     }
 
     Bitboard queens = pos.pieces(Us, QUEEN);
     while (queens) {
-        Square from = lsb(queens);
-        queens &= queens - 1;
+        Square from = pop_lsb(queens);
         Bitboard targets = queen_attacks(from, occupied_squares) & target_squares;
         while (targets) {
-            Square to = lsb(targets);
-            targets &= targets - 1;
+            Square to = pop_lsb(targets);
             *list++ = ExtMove{Move(from, to), 0};
         }
     }
@@ -237,9 +225,24 @@ void MoveList::generate_legal(const Position& pos) {
     ExtMove* cur = list.data();
     ExtMove* end = last;
     last = list.data();
+
+    Color us = pos.side_to_move();
+    Bitboard pinned = pos.blockers_for_king(us);
+    Square ksq = pos.king_square(us);
+
     for (ExtMove* p = cur; p < end; ++p) {
-        if (pos.legal(p->move)) {
-            *last++ = *p;
+        Move m = p->move;
+        MoveType type = m.type_of();
+        Square from = m.from_sq();
+
+        if (type == EN_PASSANT || type == CASTLING || type_of(pos.piece_on(from)) == KING) {
+            if (pos.legal(m, pinned)) {
+                *last++ = *p;
+            }
+        } else {
+            if (!(pinned & square_bb(from)) || aligned(from, m.to_sq(), ksq)) {
+                *last++ = *p;
+            }
         }
     }
 }

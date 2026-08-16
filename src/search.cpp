@@ -183,9 +183,11 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 
     int legal_moves = 0;
     size_t p_idx = to_index(ply);
+    Bitboard pinned = pos.blockers_for_king(pos.side_to_move());
     MovePicker picker(pos, Move::none(), ply, &heuristics, Move::none(), Move::none(), ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos, !in_check, !in_check)) != Move::none()) {
+        if (!pos.legal(m, pinned)) continue;
         StateInfo next_si;
         if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
             next_si.accumulator = &ss.accumulators[to_index(ply + 1)];
@@ -337,12 +339,12 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Bound bound_type = BOUND_UPPER;
 
     size_t p_idx = to_index(ply);
+    Bitboard pinned = pos.blockers_for_king(us);
     MovePicker picker(pos, tt_move, ply, &heuristics, prev_move, prev_move_2, ss.move_list[p_idx], ss.bad_captures[p_idx]);
     Move m;
     while ((m = picker.next_move(pos)) != Move::none()) {
-        if (m == ss.excluded_move) {
-            continue;
-        }
+        if (m == ss.excluded_move) continue;
+        if (!pos.legal(m, pinned)) continue;
         bool is_cap = (m.type_of() != CASTLING) && ((pos.piece_on(m.to_sq()) != NO_PIECE) || (m.type_of() == EN_PASSANT) || (m.type_of() == PROMOTION));
         StateInfo next_si;
         if (to_index(ply + 1) < MAX_PLY && ss.accumulators) {
@@ -680,7 +682,9 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     {
         MoveList list;
         list.generate(pos);
+        Bitboard root_pinned = pos.blockers_for_king(pos.side_to_move());
         for (size_t i = 0; i < list.size(); ++i) {
+            if (!pos.legal(list[i].move, root_pinned)) continue;
             StateInfo si;
             si.accumulator = &main_worker->accumulators[0];
             if (main_worker->pos.make_move(list[i].move, si)) {
@@ -754,7 +758,8 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 for (int j = 0; j < child_len && current_depth < d; ++j) {
                     Move child_m = main_worker->ss.pv_table[1][static_cast<size_t>(j)];
-                    if (child_m == Move::none() || !child_m.is_ok() || !pv_pos.pseudo_legal(child_m) || !pv_pos.legal(child_m)) break;
+                    Bitboard pv_pinned = pv_pos.blockers_for_king(pv_pos.side_to_move());
+                    if (child_m == Move::none() || !child_m.is_ok() || !pv_pos.pseudo_legal(child_m) || !pv_pos.legal(child_m, pv_pinned)) break;
 
                     pv_str += " " + child_m.to_string();
                     if (!pv_pos.make_move(child_m, pv_history[pv_idx++])) break;
@@ -913,7 +918,8 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             for (int j = 0; j < pv_len && current_depth < d && pv_idx < MAX_PLY; ++j) {
                 Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
-                if (m == Move::none() || !m.is_ok() || !pv_pos.pseudo_legal(m) || !pv_pos.legal(m)) break;
+                Bitboard pv_pinned = pv_pos.blockers_for_king(pv_pos.side_to_move());
+                if (m == Move::none() || !m.is_ok() || !pv_pos.pseudo_legal(m) || !pv_pos.legal(m, pv_pinned)) break;
 
                 pv_str += (pv_str.empty() ? "" : " ") + m.to_string();
                 if (!pv_pos.make_move(m, pv_history[pv_idx++])) break;
@@ -983,20 +989,22 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     }
 
     // If main thread failed to retrieve move or best_move is illegal, fallback check PV table, TT, or legal movegen
-    if (best_move == Move::none() || !pos.legal(best_move)) {
-        if (main_worker->ss.pv_length[0] > 0 && pos.legal(main_worker->ss.pv_table[0][0])) {
+    Bitboard fallback_pinned = pos.blockers_for_king(pos.side_to_move());
+    if (best_move == Move::none() || !pos.legal(best_move, fallback_pinned)) {
+        if (main_worker->ss.pv_length[0] > 0 && pos.legal(main_worker->ss.pv_table[0][0], fallback_pinned)) {
             best_move = main_worker->ss.pv_table[0][0];
         } else {
             Value dummy_score, dummy_eval;
             int dummy_depth;
             Bound dummy_bound;
             Move tt_m = Move::none();
-            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.pseudo_legal(tt_m) && pos.legal(tt_m)) {
+            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.pseudo_legal(tt_m) && pos.legal(tt_m, fallback_pinned)) {
                 best_move = tt_m;
             } else {
                 MoveList list;
                 list.generate(pos);
                 for (size_t i = 0; i < list.size(); ++i) {
+                    if (!pos.legal(list[i].move, fallback_pinned)) continue;
                     StateInfo si;
                     si.accumulator = &main_worker->accumulators[0];
                     if (main_worker->pos.make_move(list[i].move, si)) {

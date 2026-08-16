@@ -71,7 +71,7 @@ public:
     [[nodiscard]] bool in_check() const;
 
     // Fast check if a pseudo-legal move is strictly legal without mutating board state
-    [[nodiscard]] bool legal(Move m) const;
+    [[nodiscard]] bool legal(Move m, Bitboard pinned) const;
 
     // Get bitboard of pieces pinning enemy/friendly pieces to the king
     [[nodiscard]] Bitboard blockers_for_king(Color c) const;

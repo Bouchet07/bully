@@ -548,7 +548,7 @@ public:
     };
 
 protected:
-    uint16_t data = 0;
+    uint16_t data;// = 0; // removed for speed
 };
 
 } // namespace Bully

@@ -493,7 +493,7 @@ bool Position::pseudo_legal(Move m) const {
     return false;
 }
 
-bool Position::legal(Move m) const {
+bool Position::legal(Move m, Bitboard pinned) const {
     Color us = side_to_move_color;
     Square from = m.from_sq();
     Square to = m.to_sq();
@@ -537,7 +537,6 @@ bool Position::legal(Move m) const {
         if (!(square_bb(to) & target_mask)) return false;
     }
 
-    Bitboard pinned = blockers_for_king(us);
     return !(pinned & square_bb(from)) || aligned(from, to, ksq);
 }
 
@@ -546,7 +545,7 @@ bool Position::in_check() const {
 }
 
 bool Position::make_move(Move m, StateInfo& new_state) {
-    if (!m.is_ok() || m.from_sq() >= SQUARE_NB || m.to_sq() >= SQUARE_NB || !legal(m)) {
+    if (!m.is_ok() || m.from_sq() >= SQUARE_NB || m.to_sq() >= SQUARE_NB) {
         return false;
     }
 

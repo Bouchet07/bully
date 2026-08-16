@@ -20,17 +20,15 @@ protected:
 
         uint64_t nodes = 0;
         MoveList list;
-        list.generate(pos);
+        list.generate_legal(pos);
 
         for (size_t i = 0; i < list.size(); ++i) {
             Move m = list[i].move;
             StateInfo next_si;
             
-            // Only count legal moves
-            if (pos.make_move(m, next_si)) {
-                nodes += perft(depth - 1, pos);
-                pos.unmake_move(m);
-            }
+            pos.make_move(m, next_si);
+            nodes += perft(depth - 1, pos);
+            pos.unmake_move(m);
         }
         return nodes;
     }
@@ -149,5 +147,5 @@ TEST_F(MoveGenTest, HorizontalEnPassantPin) {
     pos.set_fen("8/8/8/K2pP2r/8/8/8/8 w - d6 0 1", si);
 
     Move ep_move = Move::make<EN_PASSANT>(SQ_E5, SQ_D6);
-    EXPECT_FALSE(pos.legal(ep_move));
+    EXPECT_FALSE(pos.legal(ep_move, pos.blockers_for_king(pos.side_to_move())));
 }
