@@ -1083,7 +1083,7 @@ bool UCI::execute_line(const std::string& line) {
             if (is_interactive()) {
                 std::cout << std::format("{}Bully Chess Engine - Detailed Technical System Info{}\n", style.cyan, style.reset);
                 std::cout << style.blue << "========================================================================\n" << style.reset;
-                std::cout << std::format(" {:<28} : {}{} {}\n", "Engine Version", style.green, EngineName, EngineVersion, style.reset);
+                std::cout << std::format(" {:<28} : {}{} {}{}\n", "Engine Version", style.green, EngineName, EngineVersion, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Target Architecture Profile", style.magenta, BuildArchName, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compiler & Version", style.green, CompilerName, style.reset);
                 std::cout << std::format(" {:<28} : {}{}{}\n", "Compilation Date & Time", style.magenta, __DATE__ " " __TIME__, style.reset);
@@ -1260,7 +1260,7 @@ void UCI::run_benchmark(int depth) {
         }
 
         if (is_interactive()) {
-            std::cout << std::format("  {:>2}  | {:<55} | {}{:<10.0f}{}\n", 
+            std::cout << std::format("  {:>2} | {:<55} | {}{:<10.0f}{}\n", 
                                      num++, fen_display, style.magenta, nps, style.reset) << std::flush;
         } else {
             std::cout << std::format("Position {:>2} : FEN: {} | Nodes: {} | Time: {} ms | NPS: {:.0f}\n", 

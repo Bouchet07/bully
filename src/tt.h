@@ -42,8 +42,8 @@ struct TTEntry {
     [[nodiscard]] Bound bound() const { return static_cast<Bound>(gen_bound8 & 3); }
     [[nodiscard]] uint8_t age() const { return static_cast<uint8_t>(gen_bound8 >> 2); }
     [[nodiscard]] Move move(uint16_t key) const { return Move(static_cast<uint16_t>(move16 ^ key)); }
-    [[nodiscard]] Value score(uint16_t key) const { return static_cast<Value>(static_cast<uint16_t>(score16) ^ key); }
-    [[nodiscard]] Value eval(uint16_t key) const { return static_cast<Value>(static_cast<uint16_t>(eval16) ^ key); }
+    [[nodiscard]] Value score(uint16_t key) const { return static_cast<Value>(static_cast<int16_t>(static_cast<uint16_t>(score16) ^ key)); }
+    [[nodiscard]] Value eval(uint16_t key) const { return static_cast<Value>(static_cast<int16_t>(static_cast<uint16_t>(eval16) ^ key)); }
 };
 
 // Ensure that a Cluster fits exactly in 32 bytes (half a standard 64-byte CPU cache line)

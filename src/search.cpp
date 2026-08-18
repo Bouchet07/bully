@@ -867,12 +867,13 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 }
 
                 if (score <= alpha) {
-                    beta = alpha;
+                    // Fail Low: Widen the lower bound. Center the upper bound to prevent ping-pong.
+                    beta = (alpha + beta) / 2;
                     alpha = std::max(alpha - delta, -VALUE_INFINITE);
                     delta += delta / 2;
                 }
                 else if (score >= beta) {
-                    alpha = beta;
+                    // Fail High: Widen the upper bound. Do NOT touch alpha.
                     beta = std::min(beta + delta, VALUE_INFINITE);
                     delta += delta / 2;
                 }
