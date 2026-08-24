@@ -3,9 +3,12 @@
 #include <atomic>
 #include <chrono>
 #include <list>
+#include <string>
+#include <array>
 #include "types.h"
 #include "position.h"
 #include "movegen.h"
+#include "nnue.h"
 
 namespace Bully {
 namespace Search {
@@ -29,12 +32,6 @@ struct Limits {
     }
 };
 
-// Global control flag to abort search immediately
-extern std::atomic<bool> stopped;
-extern std::atomic<bool> pondering;
-extern std::atomic<int64_t> search_start_time_ms;
-extern int num_threads;
-extern int multipv_count;
 // Search Configuration Options
 struct SearchConfig {
     bool nmp = true;
@@ -53,33 +50,24 @@ struct SearchConfig {
 
 extern SearchConfig config;
 
-// Backward-compatibility references
-inline bool& use_nmp = config.nmp;
-inline bool& use_lmr = config.lmr;
-inline bool& use_rfp = config.rfp;
-inline bool& use_lmp = config.lmp;
-inline bool& use_fp = config.fp;
-inline bool& use_check_extensions = config.check_extensions;
-inline bool& use_singular_extensions = config.singular_extensions;
-inline bool& use_aspiration_window = config.aspiration_window;
-inline bool& use_quiescence = config.quiescence;
-inline bool& use_tt = config.tt;
-inline bool& use_killers = config.killers;
-inline bool& use_history = config.history;
+// Global control flags
+extern std::atomic<bool> stopped;
+extern std::atomic<bool> pondering;
+extern std::atomic<int64_t> search_start_time_ms;
 
 // Quiet & Capture Move Ordering heuristic tables shared across all search threads
 struct SharedHeuristics {
     // 1D History: [Piece][ToSquare]
-    std::array<std::array<std::atomic<int>, 64>, 16> history;
+    std::array<std::array<int, 64>, 16> history;
 
     // 1-ply Continuation History: [PiecePrev * 64 + ToSqPrev][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_1;
+    std::array<std::array<std::array<int, 64>, 16>, 1024> cont_history_1;
 
     // 2-ply Continuation History: [PiecePrev2 * 64 + ToSqPrev2][PieceCurr][ToSqCurr]
-    std::array<std::array<std::array<std::atomic<int>, 64>, 16>, 1024> cont_history_2;
+    std::array<std::array<std::array<int, 64>, 16>, 1024> cont_history_2;
 
     // Capture History: [Piece][ToSquare][VictimPieceType]
-    std::array<std::array<std::array<std::atomic<int>, 8>, 64>, 16> capture_history;
+    std::array<std::array<std::array<int, 8>, 64>, 16> capture_history;
 
     SharedHeuristics() {
         clear();
@@ -87,21 +75,21 @@ struct SharedHeuristics {
 
     void clear() {
         for (auto& row : history) {
-            for (auto& val : row) val.store(0, std::memory_order_relaxed);
+            for (auto& val : row) val = 0;
         }
         for (auto& table : cont_history_1) {
             for (auto& row : table) {
-                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+                for (auto& val : row) val = 0;
             }
         }
         for (auto& table : cont_history_2) {
             for (auto& row : table) {
-                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+                for (auto& val : row) val = 0;
             }
         }
         for (auto& table : capture_history) {
             for (auto& row : table) {
-                for (auto& val : row) val.store(0, std::memory_order_relaxed);
+                for (auto& val : row) val = 0;
             }
         }
     }
@@ -123,14 +111,11 @@ struct Heuristics {
 
 constexpr int HISTORY_MAX = 16384;
 
-// Continuous gravity update formula for atomic history values
-inline void update_history(std::atomic<int>& entry, int bonus) {
+// Continuous gravity update formula for racy history values
+inline void update_history(int& entry, int bonus) {
     int clamped_bonus = std::clamp(bonus, -HISTORY_MAX, HISTORY_MAX);
-    int current = entry.load(std::memory_order_relaxed);
-    int next;
-    do {
-        next = current + clamped_bonus - (current * std::abs(clamped_bonus)) / HISTORY_MAX;
-    } while (!entry.compare_exchange_weak(current, next, std::memory_order_relaxed));
+    int current = entry; // Racy read
+    entry = current + clamped_bonus - (current * std::abs(clamped_bonus)) / HISTORY_MAX; // Racy write
 }
 
 // Correction History table mapping pawn structures to static evaluation adjustments
@@ -189,17 +174,26 @@ struct SearchState {
     void check_limits();
 };
 
-// Start searching a position on a separate thread
-void start(const Position& pos, const Limits& limits, std::list<StateInfo>& history);
+// ============================================================================
+// Unified Search API
+// ============================================================================
 
-// Wait for running search thread to complete naturally without requesting premature stop
-void wait_for_search();
+// 1. Thread Management
+void set_threads(int count);
+[[nodiscard]] int get_threads();
 
-// Gracefully stop any running search and block until all worker threads are joined
-void stop_and_join();
+// 2. MultiPV
+void set_multipv(int count);
+[[nodiscard]] int get_multipv();
 
-// Get the total nodes searched in the last completed search run
-uint64_t get_last_search_nodes();
+// 3. Search Lifecycle
+void start(const Position& pos, const Limits& limits, const std::list<StateInfo>& history);
+void stop();
+void wait();
+[[nodiscard]] bool is_searching();
+
+// 4. Statistics
+[[nodiscard]] uint64_t get_last_search_nodes();
 
 } // namespace Search
 } // namespace Bully

@@ -30,6 +30,7 @@ set(ENGINE_SOURCES
     src/uci.cpp
     src/syzygy.cpp
     src/cli.cpp
+    src/threadpool.cpp
     Pyrrhic/tbprobe.c
 )
 
@@ -47,6 +48,7 @@ set(ENGINE_HEADERS
     src/uci.h
     src/syzygy.h
     src/cli.h
+    src/threadpool.h
 )
 
 # Copy customized tablebase config to the submodule directory at configure time

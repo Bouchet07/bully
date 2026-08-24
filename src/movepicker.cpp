@@ -28,14 +28,14 @@ static inline int score_quiet(Move m, Move prev_move, Move prev_move_2, const Po
 
     if (heuristics && heuristics->shared && Search::config.history) {
         Piece pc = pos.piece_on(m.from_sq());
-        score += heuristics->shared->history[to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
+        score += heuristics->shared->history[to_index(pc)][to_index(m.to_sq())];
 
         if (prev_move.is_ok()) {
             Piece pc1 = pos.piece_on(prev_move.to_sq());
             if (pc1 != NO_PIECE) {
                 size_t prev_idx1 = to_index(pc1) * 64 + to_index(prev_move.to_sq());
                 if (prev_idx1 < 1024) {
-                    score += heuristics->shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
+                    score += heuristics->shared->cont_history_1[prev_idx1][to_index(pc)][to_index(m.to_sq())];
                 }
             }
         }
@@ -45,7 +45,7 @@ static inline int score_quiet(Move m, Move prev_move, Move prev_move_2, const Po
             if (pc2 != NO_PIECE) {
                 size_t prev_idx2 = to_index(pc2) * 64 + to_index(prev_move_2.to_sq());
                 if (prev_idx2 < 1024) {
-                    score += heuristics->shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())].load(std::memory_order_relaxed);
+                    score += heuristics->shared->cont_history_2[prev_idx2][to_index(pc)][to_index(m.to_sq())];
                 }
             }
         }
@@ -80,7 +80,7 @@ Move MovePicker::next_move(const Position& pos, bool skip_quiets, bool skip_bad_
                         PieceType victim_pt = (m.type_of() == EN_PASSANT) ? PAWN : type_of(pos.piece_on(m.to_sq()));
                         int cap_hist = 0;
                         if (heuristics_ && heuristics_->shared && Search::config.history) {
-                            cap_hist = heuristics_->shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)].load(std::memory_order_relaxed) / 32;
+                            cap_hist = heuristics_->shared->capture_history[to_index(pc)][to_index(m.to_sq())][to_index(victim_pt)] / 32;
                         }
                         list_[i].value = 900000 + get_piece_value(victim_pt) * 10 - get_piece_value(type_of(pc)) + cap_hist;
                     }

@@ -181,3 +181,27 @@ TEST_F(TTTest, MemoryAlignment) {
     uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
     EXPECT_EQ(addr % 64, 0);
 }
+
+// 7. Negative numbers and boundary limits
+TEST_F(TTTest, NegativeScorePreservation) {
+    TT.resize(1);
+    TT.clear();
+
+    Key key = 0x1122334455667788ULL;
+    Move move(SQ_D7, SQ_D5);
+    Value score = -450; // Negative score (e.g., down a Rook)
+    Value eval = -400;  // Negative static eval
+    int depth = 10;
+    Bound bound = BOUND_LOWER;
+
+    TT.save(key, move, score, eval, depth, bound, 1);
+
+    Move probed_move;
+    Value probed_score, probed_eval;
+    int probed_depth;
+    Bound probed_bound;
+
+    EXPECT_TRUE(TT.probe(key, probed_move, probed_score, probed_eval, probed_depth, probed_bound, 1));
+    EXPECT_EQ(probed_score, -450); // This would have failed before our fix!
+    EXPECT_EQ(probed_eval, -400);
+}

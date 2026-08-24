@@ -23,6 +23,9 @@ public:
     // Checks if running in terminal and prints welcome banner if so
     void init();
 
+    // Restores terminal to original state
+    void end();
+
     // Core execution loop
     void loop();
 

@@ -49,7 +49,7 @@ TEST_F(SearchTest, SearchLifecycle) {
     Search::start(pos, limits, history);
 
     // Join and block until complete
-    Search::stop_and_join();
+    Search::stop();
 
     // Verification
     EXPECT_TRUE(Search::stopped.load());
@@ -76,7 +76,7 @@ TEST_F(SearchTest, InfiniteSearchStopping) {
     EXPECT_FALSE(Search::stopped.load());
 
     // Abruptly stop search
-    Search::stop_and_join();
+    Search::stop();
 
     // Confirm it terminated
     EXPECT_TRUE(Search::stopped.load());
@@ -98,7 +98,7 @@ TEST_F(SearchTest, TacticalMateResolution) {
     limits_fools.silent = true;
 
     Search::start(pos_fools, limits_fools, hist_fools);
-    Search::wait_for_search();
+    Search::wait();
 
     Move move_fools;
     Value score_fools, eval_fools;
@@ -121,7 +121,7 @@ TEST_F(SearchTest, TacticalMateResolution) {
     limits_scholars.silent = true;
 
     Search::start(pos_scholars, limits_scholars, hist_scholars);
-    Search::wait_for_search();
+    Search::wait();
 
     Move move_scholars;
     Value score_scholars, eval_scholars;
@@ -147,7 +147,7 @@ TEST_F(SearchTest, FiftyMoveRuleDraw) {
     limits.silent = true;
 
     Search::start(pos, limits, history);
-    Search::wait_for_search();
+    Search::wait();
 
     Move move;
     Value score, eval;

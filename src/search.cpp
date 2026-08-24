@@ -21,6 +21,7 @@
 #endif
 
 #include "search.h"
+#include "threadpool.h"
 #include "tt.h"
 #include "movegen.h"
 #include "movepicker.h"
@@ -67,7 +68,6 @@ std::atomic<uint64_t> last_search_nodes(0);
 int num_threads = 1;
 int multipv_count = 1;
 SearchConfig config;
-static std::thread controller_thread;
 
 // LMR reductions table
 static int Reductions[MAX_PLY][MAX_MOVES];
@@ -86,16 +86,6 @@ struct SearchInitializer {
         }
     }
 } search_initializer;
-
-// Thread Worker structure
-struct SearchWorker {
-    int id = 0;
-    Position pos;
-    std::vector<StateInfo> history_stack;
-    std::array<NNUE::Accumulator, MAX_PLY> accumulators;
-    SearchState ss;
-    Heuristics heuristics;
-};
 
 static bool is_repetition(const Position& pos) {
     int rule50 = pos.rule50();
@@ -150,7 +140,7 @@ static Value evaluate_position(const Position& pos, const SearchState& ss) {
 }
 
 static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchState& ss, Heuristics& heuristics) {
-    if (use_tt) TT.prefetch(pos.key());
+    if (config.tt) TT.prefetch(pos.key());
 
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
@@ -219,7 +209,7 @@ static Value quiescence(Position& pos, Value alpha, Value beta, int ply, SearchS
 }
 
 static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, SearchState& ss, Heuristics& heuristics, Move prev_move = Move::none(), Move prev_move_2 = Move::none()) {
-    if (use_tt) TT.prefetch(pos.key());
+    if (config.tt) TT.prefetch(pos.key());
 
     if ((ss.nodes & 1023) == 0) {
         ss.check_limits();
@@ -245,7 +235,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     if (depth <= 0) {
-        return use_quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : evaluate_position(pos, ss);
+        return config.quiescence ? quiescence(pos, alpha, beta, ply, ss, heuristics) : evaluate_position(pos, ss);
     }
 
     ss.seldepth = std::max(ss.seldepth, ply);
@@ -260,7 +250,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     int tt_depth = -1;
     Bound tt_bound = BOUND_NONE;
 
-    if (use_tt && TT.probe(pos.key(), tt_move, tt_score, tt_eval, tt_depth, tt_bound, ply)) {
+    if (config.tt && TT.probe(pos.key(), tt_move, tt_score, tt_eval, tt_depth, tt_bound, ply)) {
         if (tt_depth >= depth && !ss.singular_search) {
             if (tt_bound == BOUND_EXACT) return tt_score;
             if (tt_bound == BOUND_UPPER && tt_score <= alpha) return alpha;
@@ -270,9 +260,9 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
 
     Color us = pos.side_to_move();
     bool in_check = pos.in_check();
-    int extension = (use_check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
+    int extension = (config.check_extensions && in_check && ply < MAX_PLY - 1) ? 1 : 0;
 
-    if (use_singular_extensions
+    if (config.singular_extensions
         && extension == 0
         && ply > 0
         && depth >= 7
@@ -305,7 +295,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     Value static_eval = evaluate_position(pos, ss);
 
     // 1.5. Reverse Futility Pruning (RFP) / Static Null Move Pruning
-    if (use_rfp
+    if (config.rfp
         && !in_check
         && depth <= 3
         && beta - alpha <= 1
@@ -318,7 +308,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
     }
 
     // 2. Null Move Pruning (NMP)
-    if (use_nmp && !in_check && depth >= 3 && static_eval >= beta) {
+    if (config.nmp && !in_check && depth >= 3 && static_eval >= beta) {
         Bitboard major_pieces = pos.pieces(us) ^ pos.pieces(us, PAWN) ^ pos.pieces(us, KING);
         if (major_pieces != 0) {
             StateInfo next_si;
@@ -366,7 +356,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             quiet_moves_searched++;
 
             // Late Move Pruning (LMP): Prune quiet non-checking moves at low depths when count exceeds threshold
-            if (use_lmp && !gives_check && !in_check && depth < 4) {
+            if (config.lmp && !gives_check && !in_check && depth < 4) {
                 int lmp_threshold = 3 + depth * depth;
                 if (quiet_moves_searched > lmp_threshold) {
                     pos.unmake_move(m);
@@ -376,7 +366,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
 
         // Futility Pruning: Prune quiet non-checking moves at depth 1 when evaluation is far below alpha
-        if (use_fp && !is_cap && !gives_check && !in_check && depth == 1) {
+        if (config.fp && !is_cap && !gives_check && !in_check && depth == 1) {
             int margin = 150;
             if (static_eval + margin < alpha) {
                 pos.unmake_move(m);
@@ -393,7 +383,7 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
             score = -pvs(pos, -beta, -alpha, depth - 1 + extension, ply + 1, ss, heuristics, m, prev_move);
         } else {
             int reduction = 0;
-            if (use_lmr && depth >= 3 && legal_moves > 4 && !is_cap && !gives_check && !in_check) {
+            if (config.lmr && depth >= 3 && legal_moves > 4 && !is_cap && !gives_check && !in_check) {
                 int d_idx = std::min(static_cast<int>(depth), static_cast<int>(MAX_PLY - 1));
                 int m_idx = std::min(legal_moves, static_cast<int>(MAX_MOVES - 1));
                 reduction = Reductions[d_idx][m_idx];
@@ -449,10 +439,10 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         if (score >= beta) {
             bound_type = BOUND_LOWER;
             
-            if (use_history) {
+            if (config.history) {
                 int bonus = std::clamp(depth * depth, 1, 1024);
                 if (!is_cap) {
-                    if (use_killers) {
+                    if (config.killers) {
                         size_t k_idx = static_cast<size_t>(ply);
                         if (heuristics.killer1[k_idx] != m) {
                             heuristics.killer2[k_idx] = heuristics.killer1[k_idx];
@@ -543,22 +533,20 @@ static Value pvs(Position& pos, Value alpha, Value beta, int depth, int ply, Sea
         }
     }
 
-    if (use_tt) {
+    if (config.tt) {
         TT.save(pos.key(), best_move, best_score, static_eval, depth, bound_type, ply);
     }
 
     return best_score;
 }
 
-// Single Worker thread entry point
-static void worker_run(SearchWorker* w) {
-    bind_thread_affinity(w->id);
+// Single Worker thread entry point for helper threads (id > 0)
+void helper_worker(WorkerThread* w) {
+    bind_thread_affinity(w->get_id());
     w->heuristics.clear();
-    int start_depth = 1 + (w->id & 1); // Alternating starting depths
-    int max_search_depth = (w->ss.limits.depth != -1) ? w->ss.limits.depth : MAX_PLY;
+    int start_depth = 1 + (w->get_id() & 1); // Alternating starting depths
 
-    // --- HELPER LAZY SMP THREAD ---
-    for (int d = start_depth; d <= max_search_depth; ++d) {
+    for (int d = start_depth; d <= MAX_PLY; ++d) {
         pvs(w->pos, -VALUE_INFINITE, VALUE_INFINITE, d, 0, w->ss, w->heuristics);
         if (stopped.load(std::memory_order_relaxed)) {
             break;
@@ -566,52 +554,21 @@ static void worker_run(SearchWorker* w) {
     }
 }
 
-// Global list of active workers (populated by controller)
-static std::vector<SearchWorker*> active_workers;
-
-static void search_thread_run(SearchWorker* w) {
-    worker_run(w);
-}
-
-// The controller thread that spawns all workers, monitors limits, joins them, and prints bestmove
-static void controller_worker(Position pos, Limits limits, std::list<StateInfo> history_copy) {
+// The controller worker (Thread 0) that coordinates helper threads, runs iterative deepening, and prints bestmove
+void controller_worker(WorkerThread* root_worker) {
     stopped.store(false, std::memory_order_relaxed);
     TT.new_search();
 
     auto start_time = std::chrono::steady_clock::now();
     search_start_time_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count(), std::memory_order_relaxed);
-    int time_limit = -1;
     Move best_move = Move::none();
-
-    // Time budget allocation
-    if (limits.time_controlled()) {
-        if (limits.movetime != -1) {
-            time_limit = limits.movetime;
-        } else {
-            int time_left = (pos.side_to_move() == WHITE) ? limits.wtime : limits.btime;
-            int inc = (pos.side_to_move() == WHITE) ? limits.winc : limits.binc;
-            
-            if (limits.movestogo > 0) {
-                time_limit = time_left / limits.movestogo + inc;
-            } else {
-                time_limit = time_left / 20 + inc / 2;
-            }
-
-            if (time_limit > time_left) {
-                time_limit = time_left - 20;
-            }
-            if (time_limit < 10) {
-                time_limit = 10;
-            }
-        }
-    }
 
     // Syzygy Root DTZ Probing
     Move best_tb_move = Move::none();
     Value tb_score = VALUE_NONE;
-    if (Syzygy::probe_root(pos, best_tb_move, tb_score)) {
+    if (Syzygy::probe_root(root_worker->pos, best_tb_move, tb_score)) {
         best_move = best_tb_move;
-        if (!limits.silent) {
+        if (!root_worker->ss.limits.silent) {
             int cp_score = (tb_score > 0 ? 10000 : (tb_score < 0 ? -10000 : 0));
             std::cout << std::format("info depth 1 seldepth 1 score cp {} nodes 1 nps 0 time 0 pv {}\n", cp_score, best_move.to_string());
             std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
@@ -622,59 +579,12 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
     stopped.store(false, std::memory_order_relaxed);
 
-    int threads_to_spawn = num_threads;
-    if (threads_to_spawn < 1) threads_to_spawn = 1;
+    // Wake up all helper workers (threads 1 to N-1)
+    Threads.start_helpers();
 
-    std::vector<std::unique_ptr<SearchWorker>> workers;
-    active_workers.clear();
-
-    auto shared_heuristics = std::make_unique<SharedHeuristics>();
-    shared_heuristics->clear();
-
-    // 1. Initialize all workers (cloning board positions and stack histories)
-    for (int i = 0; i < threads_to_spawn; ++i) {
-        auto w = std::make_unique<SearchWorker>();
-        w->id = i;
-        w->heuristics.shared = shared_heuristics.get();
-        w->heuristics.clear();
-        w->ss.limits = limits;
-        w->ss.thread_id = i;
-        w->ss.time_limit = time_limit;
-        w->ss.accumulators = w->accumulators.data();
-        
-        // Clone stack history with guaranteed capacity reserved
-        w->history_stack.clear();
-        w->history_stack.reserve(history_copy.size() + MAX_PLY + 256);
-        if (history_copy.empty()) {
-            w->history_stack.emplace_back();
-            w->history_stack.back().accumulator = &w->accumulators[0];
-            w->pos.set_fen(pos.get_fen(), w->history_stack.back());
-        } else {
-            for (const auto& si : history_copy) {
-                w->history_stack.push_back(si);
-            }
-            for (size_t k = 0; k < w->history_stack.size(); ++k) {
-                w->history_stack[k].previous = (k == 0) ? nullptr : &w->history_stack[k-1];
-                w->history_stack[k].accumulator = (k < MAX_PLY) ? &w->accumulators[k] : nullptr;
-            }
-            w->pos = pos;
-            w->pos.set_state_pointer(&w->history_stack.back());
-        }
-
-        active_workers.push_back(w.get());
-        workers.push_back(std::move(w));
-    }
-
-    std::vector<std::thread> helper_threads;
-
-    // 2. Spawn helper threads (id > 0)
-    for (int i = 1; i < threads_to_spawn; ++i) {
-        helper_threads.emplace_back(search_thread_run, workers[static_cast<size_t>(i)].get());
-    }
-
-    // 3. Run main thread (id = 0) in the controller thread
-    SearchWorker* main_worker = workers[0].get();
-    int max_search_depth = (limits.depth != -1) ? limits.depth : MAX_PLY;
+    // Run root worker (Thread 0)
+    bind_thread_affinity(0);
+    int max_search_depth = (root_worker->ss.limits.depth != -1) ? root_worker->ss.limits.depth : MAX_PLY;
 
     struct RootMove {
         Move move = Move::none();
@@ -685,33 +595,34 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
     std::vector<RootMove> root_moves;
     {
         MoveList list;
-        list.generate(pos);
-        Bitboard root_pinned = pos.blockers_for_king(pos.side_to_move());
+        list.generate(root_worker->pos);
+        Bitboard root_pinned = root_worker->pos.blockers_for_king(root_worker->pos.side_to_move());
         for (size_t i = 0; i < list.size(); ++i) {
-            if (!pos.legal(list[i].move, root_pinned)) continue;
+            if (!root_worker->pos.legal(list[i].move, root_pinned)) continue;
             StateInfo si;
-            si.accumulator = &main_worker->accumulators[0];
-            if (main_worker->pos.make_move(list[i].move, si)) {
+            si.accumulator = &root_worker->accumulators[0];
+            if (root_worker->pos.make_move(list[i].move, si)) {
                 RootMove rm;
                 rm.move = list[i].move;
                 rm.score = -VALUE_INFINITE;
                 root_moves.push_back(rm);
-                main_worker->pos.unmake_move(list[i].move);
+                root_worker->pos.unmake_move(list[i].move);
             }
         }
     }
 
     if (root_moves.empty()) {
-        if (!limits.silent) {
+        if (!root_worker->ss.limits.silent) {
             std::cout << "bestmove none\n" << std::flush;
         }
         stopped.store(true, std::memory_order_relaxed);
+        Threads.wait_for_helpers();
         return;
     }
 
     Value last_score = VALUE_ZERO;
     for (int d = 1; d <= max_search_depth; ++d) {
-        main_worker->ss.seldepth = 0;
+        root_worker->ss.seldepth = 0;
 
         if (multipv_count > 1) {
             for (size_t i = 0; i < root_moves.size(); ++i) {
@@ -721,29 +632,29 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
                 Move m = root_moves[i].move;
                 StateInfo si;
-                si.accumulator = &main_worker->accumulators[0];
-                if (!main_worker->pos.make_move(m, si)) {
+                si.accumulator = &root_worker->accumulators[0];
+                if (!root_worker->pos.make_move(m, si)) {
                     continue;
                 }
-                main_worker->ss.nodes++;
+                root_worker->ss.nodes++;
 
                 Value score;
                 int n_pv = std::min(multipv_count, static_cast<int>(root_moves.size()));
                 if (static_cast<int>(i) < n_pv) {
-                    score = -pvs(main_worker->pos, -VALUE_INFINITE, VALUE_INFINITE, d - 1, 1, main_worker->ss, main_worker->heuristics);
+                    score = -pvs(root_worker->pos, -VALUE_INFINITE, VALUE_INFINITE, d - 1, 1, root_worker->ss, root_worker->heuristics);
                 } else {
                     Value alpha = root_moves[static_cast<size_t>(n_pv - 1)].score;
                     if (alpha == -VALUE_INFINITE) {
-                        score = -pvs(main_worker->pos, -VALUE_INFINITE, VALUE_INFINITE, d - 1, 1, main_worker->ss, main_worker->heuristics);
+                        score = -pvs(root_worker->pos, -VALUE_INFINITE, VALUE_INFINITE, d - 1, 1, root_worker->ss, root_worker->heuristics);
                     } else {
-                        score = -pvs(main_worker->pos, -alpha - 1, -alpha, d - 1, 1, main_worker->ss, main_worker->heuristics);
+                        score = -pvs(root_worker->pos, -alpha - 1, -alpha, d - 1, 1, root_worker->ss, root_worker->heuristics);
                         if (score > alpha) {
-                            score = -pvs(main_worker->pos, -VALUE_INFINITE, -alpha, d - 1, 1, main_worker->ss, main_worker->heuristics);
+                            score = -pvs(root_worker->pos, -VALUE_INFINITE, -alpha, d - 1, 1, root_worker->ss, root_worker->heuristics);
                         }
                     }
                 }
 
-                main_worker->pos.unmake_move(m);
+                root_worker->pos.unmake_move(m);
 
                 if (stopped.load(std::memory_order_relaxed)) {
                     break;
@@ -752,16 +663,16 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 root_moves[i].score = score;
 
                 std::string pv_str = m.to_string();
-                Position pv_pos = pos;
+                Position pv_pos = root_worker->pos;
                 std::vector<StateInfo> pv_history(MAX_PLY);
                 size_t pv_idx = 0;
                 pv_pos.make_move(m, pv_history[pv_idx++]);
 
-                int child_len = main_worker->ss.pv_length[1];
+                int child_len = root_worker->ss.pv_length[1];
                 int current_depth = 1;
 
                 for (int j = 0; j < child_len && current_depth < d; ++j) {
-                    Move child_m = main_worker->ss.pv_table[1][static_cast<size_t>(j)];
+                    Move child_m = root_worker->ss.pv_table[1][static_cast<size_t>(j)];
                     Bitboard pv_pinned = pv_pos.blockers_for_king(pv_pos.side_to_move());
                     if (child_m == Move::none() || !child_m.is_ok() || !pv_pos.pseudo_legal(child_m) || !pv_pos.legal(child_m, pv_pinned)) break;
 
@@ -810,9 +721,9 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             uint64_t total_nodes = 0;
             int max_seldepth = 0;
-            for (const auto& w : workers) {
-                total_nodes += w->ss.nodes;
-                max_seldepth = std::max(max_seldepth, w->ss.seldepth);
+            for (size_t w = 0; w < Threads.size(); ++w) {
+                total_nodes += Threads.get_worker(w)->ss.nodes;
+                max_seldepth = std::max(max_seldepth, Threads.get_worker(w)->ss.seldepth);
             }
 
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -821,7 +732,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             double secs = static_cast<double>(elapsed) / 1000.0;
             double nps = (secs > 0.0) ? (static_cast<double>(total_nodes) / secs) : 0.0;
 
-            if (!limits.silent) {
+            if (!root_worker->ss.limits.silent) {
                 int n_pv = std::min(multipv_count, static_cast<int>(root_moves.size()));
                 for (int i = 0; i < n_pv; ++i) {
                     Value score = root_moves[static_cast<size_t>(i)].score;
@@ -843,7 +754,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 best_move = root_moves[0].move;
             }
 
-            if (limits.time_controlled() && elapsed >= time_limit) {
+            if (root_worker->ss.limits.time_controlled() && elapsed >= root_worker->ss.time_limit) {
                 break;
             }
             last_score = root_moves[0].score;
@@ -853,27 +764,26 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             Value beta = VALUE_INFINITE;
             int delta = 35;
 
-            if (use_aspiration_window && d >= 5) {
+            if (config.aspiration_window && d >= 5) {
                 alpha = std::max(last_score - delta, -VALUE_INFINITE);
                 beta = std::min(last_score + delta, VALUE_INFINITE);
             }
 
             Value score = VALUE_ZERO;
             while (true) {
-                score = pvs(main_worker->pos, alpha, beta, d, 0, main_worker->ss, main_worker->heuristics);
+                score = pvs(root_worker->pos, alpha, beta, d, 0, root_worker->ss, root_worker->heuristics);
 
                 if (stopped.load(std::memory_order_relaxed)) {
                     break;
                 }
 
                 if (score <= alpha) {
-                    // Fail Low: Widen the lower bound. Center the upper bound to prevent ping-pong.
-                    beta = (alpha + beta) / 2;
+                    // Fail Low: Widen the lower bound.
                     alpha = std::max(alpha - delta, -VALUE_INFINITE);
                     delta += delta / 2;
                 }
                 else if (score >= beta) {
-                    // Fail High: Widen the upper bound. Do NOT touch alpha.
+                    // Fail High: Widen the upper bound.
                     beta = std::min(beta + delta, VALUE_INFINITE);
                     delta += delta / 2;
                 }
@@ -886,14 +796,14 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 break;
             }
 
-            if (main_worker->ss.pv_length[0] > 0) {
-                best_move = main_worker->ss.pv_table[0][0];
+            if (root_worker->ss.pv_length[0] > 0) {
+                best_move = root_worker->ss.pv_table[0][0];
             } else {
                 Move depth_best_move = Move::none();
                 Value dummy_score, dummy_eval;
                 int dummy_depth;
                 Bound dummy_bound;
-                if (TT.probe(main_worker->pos.key(), depth_best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)) {
+                if (TT.probe(root_worker->pos.key(), depth_best_move, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0)) {
                     if (depth_best_move != Move::none()) {
                         best_move = depth_best_move;
                     }
@@ -902,9 +812,9 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
 
             uint64_t total_nodes = 0;
             int max_seldepth = 0;
-            for (const auto& w : workers) {
-                total_nodes += w->ss.nodes;
-                max_seldepth = std::max(max_seldepth, w->ss.seldepth);
+            for (size_t w = 0; w < Threads.size(); ++w) {
+                total_nodes += Threads.get_worker(w)->ss.nodes;
+                max_seldepth = std::max(max_seldepth, Threads.get_worker(w)->ss.seldepth);
             }
 
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -914,15 +824,15 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
             double nps = (secs > 0.0) ? (static_cast<double>(total_nodes) / secs) : 0.0;
 
             std::string pv_str;
-            Position pv_pos = pos;
+            Position pv_pos = root_worker->pos;
             std::vector<StateInfo> pv_history(MAX_PLY);
             size_t pv_idx = 0;
 
-            int pv_len = main_worker->ss.pv_length[0];
+            int pv_len = root_worker->ss.pv_length[0];
             int current_depth = 0;
 
             for (int j = 0; j < pv_len && current_depth < d && pv_idx < MAX_PLY; ++j) {
-                Move m = main_worker->ss.pv_table[0][static_cast<size_t>(j)];
+                Move m = root_worker->ss.pv_table[0][static_cast<size_t>(j)];
                 Bitboard pv_pinned = pv_pos.blockers_for_king(pv_pos.side_to_move());
                 if (m == Move::none() || !m.is_ok() || !pv_pos.pseudo_legal(m) || !pv_pos.legal(m, pv_pinned)) break;
 
@@ -958,7 +868,7 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 current_depth++;
             }
 
-            if (!limits.silent) {
+            if (!root_worker->ss.limits.silent) {
                 if (std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
                     int mate_plies = VALUE_MATE - std::abs(score);
                     int mate_moves = (mate_plies + 1) / 2;
@@ -972,11 +882,11 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
                 std::cout << std::flush;
             }
 
-            if (limits.time_controlled() && elapsed >= time_limit) {
+            if (root_worker->ss.limits.time_controlled() && elapsed >= root_worker->ss.time_limit) {
                 break;
             }
 
-            if (limits.depth == -1 && std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
+            if (root_worker->ss.limits.depth == -1 && std::abs(score) >= VALUE_MATE_IN_MAX_PLY) {
                 break;
             }
 
@@ -984,37 +894,32 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
     }
 
-    // 4. Search is complete: Stop all threads and join them
+    // 4. Search is complete: Stop all helper threads and wait for them to finish
     stopped.store(true, std::memory_order_relaxed);
-
-    for (auto& t : helper_threads) {
-        if (t.joinable()) {
-            t.join();
-        }
-    }
+    Threads.wait_for_helpers();
 
     // If main thread failed to retrieve move or best_move is illegal, fallback check PV table, TT, or legal movegen
-    Bitboard fallback_pinned = pos.blockers_for_king(pos.side_to_move());
-    if (best_move == Move::none() || !pos.legal(best_move, fallback_pinned)) {
-        if (main_worker->ss.pv_length[0] > 0 && pos.legal(main_worker->ss.pv_table[0][0], fallback_pinned)) {
-            best_move = main_worker->ss.pv_table[0][0];
+    Bitboard fallback_pinned = root_worker->pos.blockers_for_king(root_worker->pos.side_to_move());
+    if (best_move == Move::none() || !root_worker->pos.legal(best_move, fallback_pinned)) {
+        if (root_worker->ss.pv_length[0] > 0 && root_worker->pos.legal(root_worker->ss.pv_table[0][0], fallback_pinned)) {
+            best_move = root_worker->ss.pv_table[0][0];
         } else {
             Value dummy_score, dummy_eval;
             int dummy_depth;
             Bound dummy_bound;
             Move tt_m = Move::none();
-            if (TT.probe(pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && pos.pseudo_legal(tt_m) && pos.legal(tt_m, fallback_pinned)) {
+            if (TT.probe(root_worker->pos.key(), tt_m, dummy_score, dummy_eval, dummy_depth, dummy_bound, 0) && root_worker->pos.pseudo_legal(tt_m) && root_worker->pos.legal(tt_m, fallback_pinned)) {
                 best_move = tt_m;
             } else {
                 MoveList list;
-                list.generate(pos);
+                list.generate(root_worker->pos);
                 for (size_t i = 0; i < list.size(); ++i) {
-                    if (!pos.legal(list[i].move, fallback_pinned)) continue;
+                    if (!root_worker->pos.legal(list[i].move, fallback_pinned)) continue;
                     StateInfo si;
-                    si.accumulator = &main_worker->accumulators[0];
-                    if (main_worker->pos.make_move(list[i].move, si)) {
+                    si.accumulator = &root_worker->accumulators[0];
+                    if (root_worker->pos.make_move(list[i].move, si)) {
                         best_move = list[i].move;
-                        main_worker->pos.unmake_move(list[i].move);
+                        root_worker->pos.unmake_move(list[i].move);
                         break;
                     }
                 }
@@ -1022,43 +927,99 @@ static void controller_worker(Position pos, Limits limits, std::list<StateInfo> 
         }
     }
 
-    if (use_tt && best_move.is_ok()) {
-        TT.save(main_worker->pos.key(), best_move, last_score, VALUE_NONE, max_search_depth, BOUND_EXACT, 0);
+    if (config.tt && best_move.is_ok()) {
+        TT.save(root_worker->pos.key(), best_move, last_score, VALUE_NONE, max_search_depth, BOUND_EXACT, 0);
     }
 
     uint64_t total = 0;
-    for (const auto& w : workers) {
-        total += w->ss.nodes;
+    for (size_t w = 0; w < Threads.size(); ++w) {
+        total += Threads.get_worker(w)->ss.nodes;
     }
     last_search_nodes.store(total, std::memory_order_relaxed);
 
-    if (!limits.silent) {
+    if (!root_worker->ss.limits.silent) {
         std::cout << std::format("bestmove {}\n", best_move.to_string()) << std::flush;
     }
+}
+
+// ============================================================================
+// Unified Search API Implementation
+// ============================================================================
+
+void set_threads(int count) {
+    int requested = count <= 0 ? static_cast<int>(std::thread::hardware_concurrency()) : count;
+    if (requested < 1) requested = 1;
+    Threads.resize(requested);
+}
+
+int get_threads() {
+    return static_cast<int>(Threads.size());
+}
+
+void set_multipv(int count) {
+    multipv_count = std::max(1, count);
+}
+
+int get_multipv() {
+    return multipv_count;
 }
 
 uint64_t get_last_search_nodes() {
     return last_search_nodes.load(std::memory_order_relaxed);
 }
 
-void wait_for_search() {
-    if (controller_thread.joinable()) {
-        controller_thread.join();
+void wait() {
+    if (Threads.size() > 0 && Threads.get_worker(0)) {
+        Threads.get_worker(0)->wait_for_completion();
     }
 }
 
-void stop_and_join() {
+void stop() {
     stopped.store(true, std::memory_order_relaxed);
-    if (controller_thread.joinable()) {
-        controller_thread.join();
+    if (Threads.size() > 0 && Threads.get_worker(0)) {
+        Threads.get_worker(0)->wait_for_completion();
     }
 }
 
-void start(const Position& pos, const Limits& limits, std::list<StateInfo>& history) {
-    stop_and_join();
-    
-    // Spawn controller thread running background tasks
-    controller_thread = std::thread(controller_worker, pos, limits, history);
+bool is_searching() {
+    return Threads.size() > 0 && Threads.get_worker(0) && Threads.get_worker(0)->is_searching();
+}
+
+void start(const Position& pos, const Limits& limits, const std::list<StateInfo>& history) {
+    stop();
+
+    // Time budget allocation
+    int time_limit = -1;
+    if (limits.time_controlled()) {
+        if (limits.movetime != -1) {
+            time_limit = limits.movetime;
+        } else {
+            int time_left = (pos.side_to_move() == WHITE) ? limits.wtime : limits.btime;
+            int inc = (pos.side_to_move() == WHITE) ? limits.winc : limits.binc;
+
+            if (limits.movestogo > 0) {
+                time_limit = time_left / limits.movestogo + inc;
+            } else {
+                time_limit = time_left / 20 + inc / 2;
+            }
+
+            if (time_limit > time_left) {
+                time_limit = time_left - 20;
+            }
+            if (time_limit < 10) {
+                time_limit = 10;
+            }
+        }
+    }
+
+    // Reset all persistent workers for the new search
+    size_t thread_count = Threads.size();
+    for (size_t i = 0; i < thread_count; ++i) {
+        Threads.get_worker(i)->reset_for_search(pos, limits, history, time_limit);
+    }
+
+    // Start controller worker (Thread 0)
+    Threads.get_worker(0)->start();
 }
 
 } // namespace Search

@@ -30,6 +30,9 @@ extern CLIStyle style;
 // Initialize Windows virtual terminal processing and style
 void init_terminal();
 
+// Restores Windows terminal to original state
+void restore_terminal();
+
 // Check if stdout is an interactive terminal
 [[nodiscard]] bool is_interactive();
 
@@ -42,16 +45,10 @@ void print_banner(bool use_utf8);
 // Print interactive help guide
 void print_interactive_help();
 
-// Print non-interactive plain help guide
-void print_plain_help();
-
 // Print interactive CLI guide for options
 void print_interactive_options();
 
-// Print plain text options list
-void print_plain_options();
-
 // Print command-line argument help guide
-void print_arguments_guide(bool use_color);
+void print_arguments_guide();
 
 } // namespace Bully

@@ -59,13 +59,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Wait for background search thread to finish if running
-        while (!Bully::Search::stopped.load(std::memory_order_relaxed)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
-
-        // Ensure search thread is joined/cleaned up
-        Bully::Search::stop_and_join();
+        // Wait for search to finish if running
+        Bully::Search::wait();
 
         return 0;
     }
@@ -73,8 +68,8 @@ int main(int argc, char** argv) {
     // Start UCI communication loop
     uci.loop();
 
-    // Ensure search thread is joined/cleaned up before exiting
-    Bully::Search::stop_and_join();
-
+    // Ensure search thread is cleaned up before exiting
+    Bully::Search::stop();
+    uci.end();
     return 0;
 }

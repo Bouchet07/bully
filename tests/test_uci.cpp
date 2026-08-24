@@ -55,9 +55,9 @@ TEST_F(UCITest, SetOption) {
 
     // Change Threads count
     uci.execute_line("setoption name Threads value 4");
-    EXPECT_EQ(Search::num_threads, 4);
+    EXPECT_EQ(Search::get_threads(), 4);
     uci.execute_line("setoption name Threads value 1");
-    EXPECT_EQ(Search::num_threads, 1);
+    EXPECT_EQ(Search::get_threads(), 1);
 
     // Change SyzygyPath
     uci.execute_line("setoption name SyzygyPath value dummy_path");

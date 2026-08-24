@@ -67,22 +67,19 @@ All engine source code, variables, and definitions must be encapsulated inside `
 - **Lock-Free XOR Tearing Prevention**: Critical fields (`move16`, `score16`, `eval16`) are XORed with the 16-bit key signature. A torn read fails key checksum check and is safely discarded without locks.
 - **Commands**: `hash <MB>` resizes the table, `hash clear` flushes all entries. `ucinewgame` stops active search and flushes TT.
 
-### 8. Search Engine & Triangular PV Table (`search.h`, `search.cpp`)
-- Implements Principal Variation Search (PVS) with Iterative Deepening on a detached worker thread.
-- **Triangular PV Table**: Maintained in `SearchState::pv_table[MAX_PLY][MAX_PLY]` and `SearchState::pv_length[MAX_PLY]`. Reconstructs exact Principal Variation lines dynamically during search tree traversal whenever `alpha` improves, ensuring 100% accurate PV line and `bestmove` rendering regardless of TT state or `use_tt` settings.
-- **Modular Search Options**: All 12 search components can be dynamically toggled ON/OFF in UCI (`setoption name <Option> value <true/false>`) and interactive CLI (`options <name> [on|off]`):
-  - `NullMovePruning` (`nmp`)
-  - `LateMoveReduction` (`lmr`)
-  - `ReverseFutilityPruning` (`rfp`)
-  - `LateMovePruning` (`lmp`)
-  - `FutilityPruning` (`fp`)
-  - `CheckExtensions` (`ce`)
-  - `AspirationWindow` (`aw`)
-  - `QuiescenceSearch` (`qs`)
-  - `UseTT` (`tt`)
-  - `KillerHeuristic` (`kh`)
-  - `HistoryHeuristic` (`hh`)
-  - `SyzygyTablebases` (`tb`)
+### 8. Search Engine & Unified API (`search.h`, `search.cpp`, `threadpool.h`)
+- Implements Principal Variation Search (PVS) with Lazy SMP multithreading across persistent `WorkerThread` instances.
+- **Zero-Allocation Search Workers**: All per-thread stacks (`history_stack`, `accumulators`, `move_list`, heuristics) are allocated once at thread creation and reused via in-place state resetting.
+- **Unified Search API (`namespace Bully::Search`)**:
+  - `start(pos, limits, history)`: Prepares workers in-place and launches search asynchronously.
+  - `stop()`: Aborts search and joins worker threads.
+  - `wait()`: Waits for search to finish naturally without aborting.
+  - `is_searching()`: Queries whether search is currently active.
+  - `set_threads(count)` / `get_threads()`: Dynamically manages worker pool size.
+  - `set_multipv(count)` / `get_multipv()`: Configures multi-PV lines.
+  - `get_last_search_nodes()`: Retrieves total nodes searched in the last run.
+  - `Search::config`: Centralized struct containing all 12 togglable search heuristics (`config.nmp`, `config.lmr`, `config.rfp`, `config.lmp`, `config.fp`, `config.check_extensions`, `config.singular_extensions`, `config.aspiration_window`, `config.quiescence`, `config.tt`, `config.killers`, `config.history`).
+- **Triangular PV Table**: Maintained in `SearchState::pv_table[MAX_PLY][MAX_PLY]` and `SearchState::pv_length[MAX_PLY]`. Reconstructs exact Principal Variation lines dynamically during search tree traversal whenever `alpha` improves, ensuring 100% accurate PV line and `bestmove` rendering regardless of TT state.
 
 ### 9. Syzygy Endgame Tablebases (`syzygy.h`, `syzygy.cpp`)
 - Integrated via **Pyrrhic** header-only C++20 probing library.

@@ -54,3 +54,5 @@ results/
 *.pgn
 ratings_test.txt
 AGENTS.md
+CMakeSettings.json
+bully.txt

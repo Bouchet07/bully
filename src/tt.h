@@ -30,12 +30,14 @@ struct TTEntry {
 
     // Save data into the entry, combining bound and age, XORing with key signature
     void save(uint16_t key, Move move, Value score, Value eval, uint8_t depth, Bound bound, uint8_t age) {
-        key16 = key;
         move16 = static_cast<uint16_t>(move.raw() ^ key);
         score16 = static_cast<int16_t>(static_cast<uint16_t>(score) ^ key);
         eval16 = static_cast<int16_t>(static_cast<uint16_t>(eval) ^ key);
         depth8 = depth;
         gen_bound8 = static_cast<uint8_t>(bound | (age << 2));
+
+        // Write the key LAST so reading threads don't match a new key to old XOR data
+        key16 = key;
     }
 
     // Accessors
